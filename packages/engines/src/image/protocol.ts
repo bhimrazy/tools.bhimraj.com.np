@@ -1,3 +1,4 @@
+import type { ErrorCode } from "./errors";
 import type { CompressOptions, CompressResult } from "./index";
 
 export interface CompressRequest {
@@ -15,4 +16,4 @@ export type WorkerRequest = CompressRequest | CancelRequest;
 
 export type WorkerResponse =
   | { id: number; ok: true; result: CompressResult }
-  | { id: number; ok: false; error: string; aborted: boolean };
+  | { id: number; ok: false; code: ErrorCode; error: string };
