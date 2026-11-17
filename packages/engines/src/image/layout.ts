@@ -60,18 +60,57 @@ export function computeLayout(
   return { width: w, height: h, src: full, dst: { x: 0, y: 0, w, h } };
 }
 
-export function scaleLayout(l: Layout, scale: number): Layout {
+export function scaleLayout(
+  l: Layout,
+  scale: number,
+  round = Math.round,
+): Layout {
   if (scale === 1) return l;
   const { dst } = l;
+  const size = (n: number) => Math.max(1, round(n * scale));
   return {
-    width: px(l.width * scale),
-    height: px(l.height * scale),
+    width: size(l.width),
+    height: size(l.height),
     src: l.src,
     dst: {
       x: Math.round(dst.x * scale),
       y: Math.round(dst.y * scale),
-      w: px(dst.w * scale),
-      h: px(dst.h * scale),
+      w: size(dst.w),
+      h: size(dst.h),
     },
   };
+}
+
+/** iOS Safari refuses canvases larger than this many pixels. */
+export const MAX_PIXELS = 16_777_216;
+/** Decode budget on phones reporting ≤ 4 GB: an RGBA copy of this is 32 MB. */
+export const LOW_MEMORY_PIXELS = 8_388_608;
+
+/** Pixels a decoded source may hold. `deviceMemory` (GB) is Chromium-only; unknown means the canvas cap. */
+export function pixelBudget(deviceMemory?: number): number {
+  return deviceMemory !== undefined && deviceMemory <= 4
+    ? LOW_MEMORY_PIXELS
+    : MAX_PIXELS;
+}
+
+/** Same aspect, area ≤ maxPixels. Floors, since rounding up can overshoot the cap. */
+export function capSize(
+  width: number,
+  height: number,
+  maxPixels: number,
+): { width: number; height: number } {
+  const area = width * height;
+  if (area <= maxPixels) return { width, height };
+  const k = Math.sqrt(maxPixels / area);
+  return {
+    width: Math.max(1, Math.floor(width * k)),
+    height: Math.max(1, Math.floor(height * k)),
+  };
+}
+
+export function capLayout(l: Layout, maxPixels: number): Layout {
+  const area = l.width * l.height;
+  return area <= maxPixels
+    ? l
+    : scaleLayout(l, Math.sqrt(maxPixels / area), Math.floor);
 }
