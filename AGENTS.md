@@ -36,3 +36,6 @@ Run before handing off; it is what CI runs:
 ```sh
 bun run verify
 ```
+
+CI also runs the browser suite (`bun run build && bun run e2e`) after `check`; run it when you touch UI,
+engines or `_headers`. Specs live in `apps/web/e2e` and assert behaviour, not markup classes.
