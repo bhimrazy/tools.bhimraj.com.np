@@ -24,6 +24,7 @@ export interface ToolSpec {
   minBytes?: number;
   width?: number;
   height?: number;
+  fit?: "cover" | "contain";
   background?: string;
 }
 
@@ -162,7 +163,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
         const { createImageEngine } = await import("@tools/engines/image");
         engine.current = createImageEngine();
       }
-      const options: CompressOptions = { ...opts, fit: "cover" };
+      const options: CompressOptions = { fit: "cover", ...opts };
       const out = await engine.current.compress(next, options, ctrl.signal);
       if (ctrl.signal.aborted) return;
 

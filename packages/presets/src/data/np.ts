@@ -1,5 +1,5 @@
 import type { Preset } from "../index";
-import { kbMax, kbMin } from "../schema";
+import { kbMax, kbMin } from "../bytes";
 
 // Figures come from an applicant-guide site, not an official PSC notice; official pages gave no sizes.
 const source = {
@@ -22,6 +22,7 @@ export const np: Preset[] = [
     kind: "photo",
     output: {
       format: "image/jpeg",
+      fit: "cover",
       width: 300,
       height: 350,
       minBytes: kbMin(10),
@@ -39,6 +40,7 @@ export const np: Preset[] = [
     kind: "signature",
     output: {
       format: "image/jpeg",
+      fit: "contain",
       width: 300,
       height: 80,
       minBytes: kbMin(5),

@@ -1,11 +1,12 @@
 import { bd } from "./data/bd";
 import { np } from "./data/np";
 import { us } from "./data/us";
-import { validatePresets } from "./schema";
 
-export { kbMax, kbMin, presetSchema, validatePresets } from "./schema";
+// Plain data only: no zod, so islands can import this. Validation lives in "@tools/presets/schema" (tests).
+export { kbMax, kbMin, MAX_HEADROOM, MIN_MARGIN } from "./bytes";
 
-export type ImageFormat = "image/jpeg" | "image/png" | "image/webp";
+/** Formats the image engine can encode. */
+export type ImageFormat = "image/jpeg" | "image/webp";
 
 export interface Preset {
   /** kebab-case, unique */
@@ -21,6 +22,8 @@ export interface Preset {
     format: ImageFormat;
     width?: number;
     height?: number;
+    /** "cover" crops from the centre; "contain" letterboxes on `background` so nothing is cut off */
+    fit: "cover" | "contain";
     minBytes?: number;
     maxBytes: number;
     /** CSS hex colour to flatten transparency onto */
@@ -32,11 +35,7 @@ export interface Preset {
   notes?: string;
 }
 
-export const presets: readonly Preset[] = validatePresets([
-  ...np,
-  ...bd,
-  ...us,
-]);
+export const presets: readonly Preset[] = [...np, ...bd, ...us];
 
 export function presetsByCountry(): Map<string, Preset[]> {
   const map = new Map<string, Preset[]>();
@@ -47,4 +46,29 @@ export function presetsByCountry(): Map<string, Preset[]> {
 
 export function getPreset(id: string): Preset | undefined {
   return presets.find((p) => p.id === id);
+}
+
+/** Structurally matches `CompressOptions` in @tools/engines/image (not imported to keep this package dependency-free). */
+export interface PresetCompressOptions {
+  maxBytes: number;
+  minBytes?: number;
+  width?: number;
+  height?: number;
+  fit: "cover" | "contain";
+  format: ImageFormat;
+  background?: string;
+}
+
+export function presetToCompressOptions(p: Preset): PresetCompressOptions {
+  const { maxBytes, minBytes, width, height, fit, format, background } =
+    p.output;
+  return {
+    maxBytes,
+    fit,
+    format,
+    ...(minBytes !== undefined && { minBytes }),
+    ...(width !== undefined && { width }),
+    ...(height !== undefined && { height }),
+    ...(background !== undefined && { background }),
+  };
 }

@@ -1,12 +1,19 @@
-// Matches @tools/presets kbMax/kbMin: portals' "KB" is ambiguous, so caps are KB x 1000 and
-// floors KB x 1024 (safe either way). Displaying with the same factors shows the portal's number.
+import { MAX_HEADROOM, MIN_MARGIN } from "@tools/presets";
+
+// Matches @tools/presets kbMax/kbMin: caps are KB x 1000 and floors KB x 1024, each with ~1% headroom.
+// Displaying undoes the headroom to show the portal's number.
 export const KB_MAX = 1000;
 export const KB_MIN = 1024;
 
-const trim = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+const trim = (n: number) => {
+  const r = Math.round(n * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+};
 
-export const statedMaxKb = (bytes: number) => trim(bytes / KB_MAX);
-export const statedMinKb = (bytes: number) => trim(bytes / KB_MIN);
+export const statedMaxKb = (bytes: number) =>
+  trim(bytes / (KB_MAX * MAX_HEADROOM));
+export const statedMinKb = (bytes: number) =>
+  trim(bytes / (KB_MIN * MIN_MARGIN));
 
 /** Result sizes use the cap's factor so "≤ 200 KB" and "198.4 KB" compare directly. */
 export function formatKb(bytes: number): string {
