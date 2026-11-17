@@ -1,5 +1,5 @@
 ---
-import { presets, type Preset } from "@tools/presets";
+import { presets, presetToCompressOptions, type Preset } from "@tools/presets";
 import type { GetStaticPaths } from "astro";
 import CompressIsland from "../components/CompressIsland.astro";
 import type { ToolSpec } from "../components/CompressTool";
@@ -22,18 +22,7 @@ const size = sizeRange(preset);
 const path = `/${preset.path}`;
 const bg = output.background && (/^#f{3}(f{3})?$/i.test(output.background) ? "white" : output.background);
 
-// The engine encodes JPEG and WebP only.
-const spec: ToolSpec | null =
-  output.format === "image/jpeg" || output.format === "image/webp"
-    ? {
-        format: output.format,
-        maxBytes: output.maxBytes,
-        ...(output.minBytes !== undefined && { minBytes: output.minBytes }),
-        ...(output.width !== undefined && { width: output.width }),
-        ...(output.height !== undefined && { height: output.height }),
-        ...(output.background !== undefined && { background: output.background }),
-      }
-    : null;
+const spec: ToolSpec = presetToCompressOptions(preset);
 
 const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].filter(Boolean).join(", ")}, ready to upload to ${preset.portal.replace(/\s*\(.*\)$/, "")}. Runs on your device; nothing is uploaded.`;
 ---

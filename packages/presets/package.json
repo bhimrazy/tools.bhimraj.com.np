@@ -5,7 +5,8 @@
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
   },
   "scripts": {
     "typecheck": "bun check"
