@@ -1,0 +1,13 @@
+// Assets-only Worker: no `main`, Cloudflare serves ./dist directly.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tools",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    // Matches build.format "file" + trailingSlash "never" in astro.config.ts.
+    "html_handling": "drop-trailing-slash",
+  },
+  // "routes": [{ "pattern": "tools.bhimraj.com.np", "custom_domain": true }]
+}

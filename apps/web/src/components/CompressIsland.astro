@@ -1,0 +1,16 @@
+---
+// Server-renders CompressTool, then hydrates it from a bundled module (no client:* directive,
+// which would inline scripts that our CSP blocks; see astro.config.ts).
+import { CompressTool, type CompressToolProps } from "./CompressTool";
+
+type Props = CompressToolProps;
+const props = Astro.props;
+---
+
+<div data-compress-tool data-props={JSON.stringify(props)}>
+  <CompressTool {...props} />
+</div>
+
+<script>
+  import "../scripts/hydrate-compress";
+</script>

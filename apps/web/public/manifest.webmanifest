@@ -1,0 +1,18 @@
+{
+  "name": "Tools: private image & PDF tools",
+  "short_name": "Tools",
+  "description": "Form-ready photos and signatures, made on your device. Files never leave it.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#fafafa",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

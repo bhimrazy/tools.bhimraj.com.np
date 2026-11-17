@@ -1,0 +1,32 @@
+---
+import CompressIsland from "../components/CompressIsland.astro";
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Compress image to KB: 20, 50, 100 KB or any size"
+  description="Compress a photo to a target size in KB, optionally resized to an exact width and height. Runs in your browser: your image is never uploaded."
+  path="/compress-image"
+>
+  <div class="grid gap-2 pb-5">
+    <h1 class="text-2xl tracking-tight sm:text-3xl">Compress an image to a size in KB</h1>
+    <p class="text-muted">Set the limit, pick a photo, download. Nothing is uploaded.</p>
+  </div>
+
+  <CompressIsland />
+
+  <section class="mt-12 grid max-w-prose gap-3 border-t border-border pt-8" aria-labelledby="how-heading">
+    <h2 id="how-heading" class="text-lg">How it works</h2>
+    <p>
+      Your browser resizes the image and saves it as a JPEG, lowering quality step by step until the file is under
+      your limit. It all happens on this device, so it works on slow connections and your photo stays private.
+    </p>
+    <p>
+      Leave width and height empty to keep the original proportions. Set both to crop to that exact size from the
+      centre, which is what most application forms expect.
+    </p>
+    <p class="text-sm text-muted">
+      “KB” here means 1,000 bytes, the stricter reading, so the file passes forms that count 1,024 bytes too.
+    </p>
+  </section>
+</Base>

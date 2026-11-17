@@ -1,0 +1,22 @@
+# deps & build
+node_modules/
+dist/
+.astro/
+.wrangler/
+*.tsbuildinfo
+coverage/
+target/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# local only
+.research/
+.idea/
+.claude/worktrees/
+.DS_Store
+playwright-report/
+test-results/
