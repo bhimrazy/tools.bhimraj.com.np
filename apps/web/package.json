@@ -10,7 +10,8 @@
     "check:csp": "bun scripts/check-csp.ts",
     "preview": "wrangler dev",
     "typecheck": "astro check",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@tools/engines": "workspace:*",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
+    "@playwright/test": "1.65.0",
     "@tailwindcss/vite": "4.3.5",
     "@tools/tsconfig": "workspace:*",
     "tailwindcss": "4.3.5",

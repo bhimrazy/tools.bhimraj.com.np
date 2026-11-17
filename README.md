@@ -15,6 +15,7 @@ packages/
   presets/      sourced registry of form specs: pixels, KB limits, format, background
   seo/          SITE_ORIGIN and URL helpers; the only place the host is configured
   tsconfig/     shared compiler settings
+bench/          engine benchmark harness (Vite page driven by Playwright)
 docs/adr/       architecture decisions
 ```
 
@@ -31,6 +32,15 @@ bun run verify         # format check, host check, typecheck, tests, build
 ```
 
 Bun's built-ins do the toolchain work: `bun fmt`, `bun check`, `bun test`, `bun run --filter`.
+
+## Testing
+
+```sh
+bun run build && bun run e2e   # Playwright against the built site (wrangler on :4402)
+bun run bench                  # on-device engine benchmark, 4x CPU throttle; not run in CI
+```
+
+First run needs `bunx playwright install chromium`. Set `PW_CHROMIUM_PATH` to use an existing Chromium.
 
 ## License
 
