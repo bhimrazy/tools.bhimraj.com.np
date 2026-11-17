@@ -24,6 +24,7 @@ import {
   IconError,
   IconLock,
 } from "./icons";
+import { ENGINE_ERRORS, errorMessage, HEIC_MSG, isHeic } from "./errors";
 
 export interface ToolSpec {
   format: OutputFormat;
@@ -59,11 +60,6 @@ const FORMAT_NAME: Record<string, string> = {
 };
 const colourName = (hex: string) =>
   /^#f{3}(f{3})?$/i.test(hex) ? "White" : hex.toUpperCase();
-
-const isHeic = (f: File) =>
-  /hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
-const HEIC_MSG =
-  "HEIC photos aren't supported yet. On iPhone, choose Settings › Camera › Formats › Most Compatible, or upload a screenshot of the photo.";
 
 function stem(name: string): string {
   const base = name
@@ -182,9 +178,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
     try {
       const dims = await readDimensions(next).catch(() => {
         throw new Error(
-          isHeic(next)
-            ? HEIC_MSG
-            : "This file couldn't be opened as an image. Try a JPEG or PNG.",
+          isHeic(next) ? HEIC_MSG : ENGINE_ERRORS["decode_failed"],
         );
       });
       if (ctrl.signal.aborted) return;
@@ -211,17 +205,9 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
       );
       requestAnimationFrame(() => resultHeading.current?.focus());
     } catch (err) {
-      if (
-        ctrl.signal.aborted ||
-        (err instanceof DOMException && err.name === "AbortError")
-      )
-        return;
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(
-        isHeic(next) && !msg.startsWith("HEIC")
-          ? HEIC_MSG
-          : msg || "Something went wrong.",
-      );
+      const msg = ctrl.signal.aborted ? null : errorMessage(err, next);
+      if (msg === null) return;
+      setError(msg);
       setStatus("");
     } finally {
       if (job.current === ctrl) setBusy(false);
