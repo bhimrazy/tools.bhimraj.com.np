@@ -1,0 +1,23 @@
+---
+import type { Preset } from "@tools/presets";
+import { IconAlert, IconCheck } from "./icons";
+
+interface Props {
+  verifiedAt: Preset["verifiedAt"];
+}
+const { verifiedAt } = Astro.props;
+---
+
+{
+  verifiedAt === null ? (
+    <span class="badge badge-warning">
+      <IconAlert class="size-3.5" />
+      Unverified
+    </span>
+  ) : (
+    <span class="badge badge-success">
+      <IconCheck class="size-3.5" />
+      Verified
+    </span>
+  )
+}

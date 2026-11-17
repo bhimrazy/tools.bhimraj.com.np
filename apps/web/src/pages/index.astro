@@ -1,5 +1,6 @@
 ---
 import { presets } from "@tools/presets";
+import { IconArrowRight, IconCheck, IconLock } from "../components/icons";
 import PresetCard from "../components/PresetCard.astro";
 import Base from "../layouts/Base.astro";
 import { countryName, groupByCountry } from "../lib/presets";
@@ -12,25 +13,26 @@ const groups = groupByCountry(presets);
   description="Resize and compress photos and signatures to exact exam and visa form specs, or to any size in KB. Private by design: files never leave your device."
   path="/"
 >
-  <section class="grid gap-4 pb-8 sm:pb-12">
-    <span class="badge badge-neutral w-fit">Private by design</span>
-    <h1 class="text-3xl tracking-tight sm:text-4xl">Form-ready photos, made on your device.</h1>
+  <section class="grid gap-4 pb-10 sm:pb-14">
+    <h1 class="text-3xl sm:text-4xl">Form-ready photos and signatures, made on your device.</h1>
     <p class="max-w-prose text-lg text-muted">
-      Files never leave your device. Pick a form below, add your photo, and download a file that meets the exact
-      size and KB limit, even on a slow connection.
+      Pick your form, add a photo, and download a file that meets its exact pixel size and KB limit.
     </p>
+    <ul class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
+      <li class="flex items-center gap-2"><IconLock class="text-text" /> Files never leave your device</li>
+      <li class="flex items-center gap-2"><IconCheck class="text-text" /> Each spec is marked verified or unverified</li>
+    </ul>
   </section>
 
-  <section aria-labelledby="tools-heading" class="grid gap-4 pb-10">
+  <section aria-labelledby="tools-heading" class="grid gap-3 pb-10">
     <h2 id="tools-heading" class="text-lg">Tools</h2>
-    <ul class="grid gap-3 sm:grid-cols-2">
-      <li>
-        <a href="/compress-image" class="card grid h-full gap-1 p-4">
-          <span class="font-medium">Compress image to a size in KB</span>
-          <span class="text-sm text-muted">Any photo to under 20, 50, 100 KB or whatever the form asks, with optional width and height.</span>
-        </a>
-      </li>
-    </ul>
+    <a href="/compress-image" class="card group flex items-center justify-between gap-4 p-4">
+      <span class="grid gap-0.5">
+        <span class="font-medium">Compress an image to a size in KB</span>
+        <span class="text-sm text-muted">Any photo to 20, 50, 100 KB or whatever the form asks, with an optional exact width and height.</span>
+      </span>
+      <IconArrowRight class="text-faint group-hover:text-text" />
+    </a>
   </section>
 
   {
@@ -38,11 +40,11 @@ const groups = groupByCountry(presets);
       <section aria-labelledby="forms-heading" class="grid gap-6">
         <div class="grid gap-1">
           <h2 id="forms-heading" class="text-lg">Exam, job and visa forms</h2>
-          <p class="text-sm text-muted">Presets set the pixel size, KB limit and background for you.</p>
+          <p class="text-sm text-muted">Each preset sets the pixel size, KB limit and background for you.</p>
         </div>
         {groups.map(([country, list]) => (
           <section aria-labelledby={`c-${country}`} class="grid gap-3">
-            <h3 id={`c-${country}`} class="flex items-center gap-3 text-xs font-medium tracking-wide text-muted uppercase">
+            <h3 id={`c-${country}`} class="flex items-center gap-3 text-xs font-medium tracking-wider text-muted uppercase">
               {countryName(country)}
               <span class="h-px flex-1 bg-border" aria-hidden="true" />
             </h3>

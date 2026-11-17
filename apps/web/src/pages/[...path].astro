@@ -2,10 +2,12 @@
 import { presets, type Preset } from "@tools/presets";
 import type { GetStaticPaths } from "astro";
 import CompressIsland from "../components/CompressIsland.astro";
+import { IconAlert } from "../components/icons";
+import SpecBadge from "../components/SpecBadge.astro";
 import type { ToolSpec } from "../components/CompressTool";
 import Base from "../layouts/Base.astro";
 import { specIssueUrl } from "../lib/links";
-import { statedMaxKb } from "../lib/units";
+import { formatBytes, statedMaxKb } from "../lib/units";
 import { countryName, dimensions, FORMAT_LABEL, formatDate, sizeRange } from "../lib/presets";
 
 export const getStaticPaths = (() =>
@@ -36,58 +38,75 @@ const spec: ToolSpec | null =
     : null;
 
 const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].filter(Boolean).join(", ")}, ready to upload to ${preset.portal.replace(/\s*\(.*\)$/, "")}. Runs on your device; nothing is uploaded.`;
+
+// `output.fit` arrives with the preset-output change; until then photos fill, others fit.
+const fit = (output as { fit?: "cover" | "contain" }).fit ?? (preset.kind === "photo" ? "cover" : "contain");
+const target = dims ?? "the required size";
+const placement =
+  fit === "cover"
+    ? `cropped to fill ${target}${bg ? ` on a ${bg} background` : ""}`
+    : `fitted onto a ${bg ?? "white"} ${target} background, with nothing cut off`;
+const exactBytes =
+  output.minBytes === undefined
+    ? `up to ${formatBytes(output.maxBytes)}`
+    : `${output.minBytes.toLocaleString("en-US")}–${formatBytes(output.maxBytes)}`;
 ---
 
 <Base title={preset.title} {description} path={path}>
   <nav aria-label="Breadcrumb" class="pb-3 text-sm text-muted">
-    <a href="/">Tools</a> <span aria-hidden="true">/</span> {countryName(preset.country)}
+    <a href="/">Tools</a> <span aria-hidden="true" class="px-1 text-faint">/</span> {countryName(preset.country)}
   </nav>
-  <div class="grid gap-2 pb-5">
-    <h1 class="text-2xl tracking-tight sm:text-3xl">{preset.title}</h1>
-    <p class="text-muted">For {preset.portal}.</p>
-    {
-      preset.verifiedAt === null ? (
-        <p class="mt-1 flex flex-wrap items-center gap-2 text-sm">
-          <span class="badge badge-warning">Unverified</span>
-          <span class="text-muted">Check the official notice before you submit.</span>
-        </p>
-      ) : (
-        <p class="mt-1 flex flex-wrap items-center gap-2 text-sm">
-          <span class="badge badge-success">Verified</span>
-          <span class="text-muted">Last verified {formatDate(preset.verifiedAt)}</span>
-        </p>
-      )
-    }
+  <div class="grid gap-3 pb-6">
+    <div class="grid gap-1">
+      <h1 class="text-2xl sm:text-3xl">{preset.title}</h1>
+      <p class="text-muted">For {preset.portal}.</p>
+    </div>
+    <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <SpecBadge verifiedAt={preset.verifiedAt} />
+      <span class="text-muted">
+        {
+          preset.verifiedAt === null
+            ? "Check the official notice before you submit."
+            : `Checked against the official notice on ${formatDate(preset.verifiedAt)}.`
+        }
+      </span>
+    </p>
   </div>
 
   {
     spec ? (
       <CompressIsland spec={spec} kind={preset.kind} />
     ) : (
-      <p class="card p-4">
-        {FORMAT_LABEL[output.format]} output isn't supported yet. Use the spec below with the{" "}
-        <a href="/compress-image">image compressor</a>.
-      </p>
+      <div class="alert alert-warning">
+        <IconAlert />
+        <p>
+          {FORMAT_LABEL[output.format]} output isn't supported yet. Use the spec below with the{" "}
+          <a href="/compress-image">image compressor</a>.
+        </p>
+      </div>
     )
   }
 
-  <section aria-labelledby="spec-heading" class="card mt-10 grid gap-3 p-4 sm:p-6">
+  <section aria-labelledby="spec-heading" class="card mt-10 grid gap-4 p-4 sm:p-6">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2 id="spec-heading" class="text-lg">The spec</h2>
-      <span class="font-mono text-xs text-muted">{preset.id}</span>
+      <span class="font-mono text-xs text-faint">{preset.id}</span>
     </div>
     <dl class="kv text-sm">
       {
         dims && (
           <div>
-            <dt>Size</dt>
+            <dt>Dimensions</dt>
             <dd>{dims}</dd>
           </div>
         )
       }
       <div>
         <dt>File size</dt>
-        <dd>{size}</dd>
+        <dd>
+          {size}
+          <span class="block text-xs text-muted">{exactBytes}</span>
+        </dd>
       </div>
       <div>
         <dt>Format</dt>
@@ -101,8 +120,14 @@ const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].fil
           </div>
         )
       }
+      <div>
+        <dt>Status</dt>
+        <dd>
+          {preset.verifiedAt ? `Verified ${formatDate(preset.verifiedAt)}` : "Unverified"}
+        </dd>
+      </div>
     </dl>
-    <div class="grid gap-1 border-t border-border pt-3 text-muted text-sm">
+    <div class="grid gap-1 border-t border-border pt-4 text-sm text-muted">
       {
         preset.source ? (
           <p>
@@ -113,22 +138,26 @@ const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].fil
         )
       }
       <p>
-        {preset.verifiedAt ? `Last verified ${formatDate(preset.verifiedAt)}.` : "Not yet verified against an official notice."}{" "}
-        <a href={specIssueUrl(preset.title, preset.path)} rel="noopener noreferrer external">Spec changed? Tell us</a>
+        Portal changed its rules?{" "}
+        <a href={specIssueUrl(preset.title, preset.path)} rel="noopener noreferrer external">Report a spec change</a>
       </p>
     </div>
   </section>
 
-  <section aria-labelledby="about-heading" class="mt-10 grid max-w-prose gap-3">
-    <h2 id="about-heading" class="text-lg">About this {preset.kind}</h2>
-    {preset.notes && <p>{preset.notes}</p>}
+  <section aria-labelledby="about-heading" class="mt-12 grid max-w-prose gap-3">
+    <h2 id="about-heading" class="text-lg">How your {preset.kind} is prepared</h2>
     <p>
-      Pick your {preset.kind} and it is cropped from the centre to {dims ?? "the required size"}{bg && `, placed on a ${bg} background,`}{" "}
-      and compressed to {output.minBytes === undefined ? `${statedMaxKb(output.maxBytes)} KB or less` : size}. Everything runs
-      in your browser, so the file never leaves your device.
+      Your {preset.kind} is {placement}, then saved as {FORMAT_LABEL[output.format].replace(/\s*\(.*\)$/, "")} at{" "}
+      {output.minBytes === undefined ? `${statedMaxKb(output.maxBytes)} KB or less` : size}. It all runs in your browser, so
+      the file never leaves your device.
     </p>
-    <p class="text-sm text-muted">
-      Tip: crop your {preset.kind} roughly to shape first so the centre crop keeps what matters.
-    </p>
+    {preset.notes && <p class="text-muted">{preset.notes}</p>}
+    {
+      fit === "cover" && (
+        <p class="text-sm text-muted">
+          Tip: crop your {preset.kind} roughly to shape first so the parts that matter stay in frame.
+        </p>
+      )
+    }
   </section>
 </Base>
