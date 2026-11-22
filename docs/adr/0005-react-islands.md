@@ -1,0 +1,49 @@
+# 0005: React islands with shadcn/ui on Base UI
+
+Status: accepted (2026-11-22). Supersedes the Preact choice in 0001; the rest of 0001 stands.
+
+## Decision
+
+- Tool islands use **React 19** through `@astrojs/react`. Content pages still ship no JavaScript:
+  only pages with a tool island load a script.
+- UI controls come from **shadcn/ui, Base UI variant** (`components.json` `style: base-nova`),
+  added with the shadcn CLI pinned as a dev dependency. Their source lives in
+  `apps/web/src/components/ui`; icons are `lucide-react`, imported one file per icon.
+- Islands are **not** hydrated with `client:*` directives. Those emit an inline `<script>` and
+  `<style>` that `script-src 'self'; style-src 'self'` blocks. Instead `Island.astro` server-renders
+  the component with a fixed `useId` prefix, and a bundled module calls `hydrateRoot` with the same
+  prefix (`src/lib/hydrate.ts`). Ids from Base UI then match between server and client.
+- Every island is wrapped in Base UI's `CSPProvider` with `disableStyleElements`, so it never
+  inserts a `<style>`; the one rule it needs is in `global.css`.
+- Controls that server-render a `style=""` attribute (Base UI `Select`, `Slider`) are rendered only
+  after hydration. React then sets their styles through the CSSOM, which the CSP allows.
+  `scripts/check-csp.ts` fails the build if a style attribute reaches the HTML.
+
+## Why
+
+shadcn/ui gives accessible, owned-source components (focus handling, keyboard support, ARIA)
+that we would otherwise write by hand, and it targets React. Base UI is the primitive layer
+shadcn now offers alongside Radix; it is MIT, maintained, and its CSP provider lets it run
+under our policy. Preact with `preact/compat` would save bytes but is not a supported target for
+these components.
+
+## Cost
+
+JavaScript on a tool page, measured with `vite build` output (entry plus static imports):
+
+| Page                           | Before (Preact)       | After (React)         |
+| ------------------------------ | --------------------- | --------------------- |
+| Home, 404                      | 0                     | 0                     |
+| Compress, each preset: on load | 22.2 KiB (9.8 KiB gz) | 283 KiB (92.8 KiB gz) |
+| Same, loaded after first paint | 1.2 KiB (0.7 KiB gz)  | 86 KiB (29.8 KiB gz)  |
+
+React DOM is about 68 KiB of the gzipped load. The format select and the exact-size tooltip (Base
+UI's positioning code) are split out with `React.lazy`. The image worker is unchanged.
+
+`command` depends on `cmdk`, which pulls four Radix packages; it is installed for search but
+not yet used on any page, so none of it ships.
+
+## Revisit
+
+If a 2–3 GB Android phone misses the ~3 s target for a 12 MP photo because of main-thread
+work, or if search needs JavaScript on content pages.

@@ -27,6 +27,9 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
   refuses releases younger than 7 days; don't bypass it.
 - CI actions are pinned to full commit SHAs with a version comment.
 - Rust/WASM only for a measured hot path; see `docs/adr/0004-rust-wasm.md`.
+- UI: React islands hydrated by our own module, never `client:*` (CSP); shadcn/ui on Base UI
+  in `apps/web/src/components/ui`; `lucide-react` imported per icon. See `docs/adr/0005-react-islands.md`
+  and `apps/web/DESIGN.md`. Colours come only from the theme block in `apps/web/src/styles/global.css`.
 - Research and business notes go in `.research/` (gitignored), never in the repo.
 
 ## Validation

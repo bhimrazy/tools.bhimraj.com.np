@@ -9,7 +9,7 @@ Live at [tools.bhimraj.com.np](https://tools.bhimraj.com.np).
 
 ```
 apps/
-  web/          Astro static site: one page per tool and per form preset
+  web/          Astro static site with React islands: one page per tool and per form preset
 packages/
   engines/      in-browser processing, one worker per engine family (image, later pdf, ai)
   presets/      sourced registry of form specs: pixels, KB limits, format, background
