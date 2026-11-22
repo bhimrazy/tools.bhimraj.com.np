@@ -1,6 +1,6 @@
 ---
 name: engineer
-description: Senior TypeScript engineer who builds one feature or fix track end to end in its own git worktree — Astro 7 static pages, Preact islands, Tailwind 4, Web Worker image processing (OffscreenCanvas, WASM) — with tests and green gates. Use for every implementation track and for fix rounds on its PR.
+description: Senior TypeScript engineer who builds one feature or fix track end to end in its own git worktree — Astro 7 static pages, React islands, Tailwind 4, Web Worker image processing (OffscreenCanvas, WASM) — with tests and green gates. Use for every implementation track and for fix rounds on its PR.
 model: sonnet
 ---
 

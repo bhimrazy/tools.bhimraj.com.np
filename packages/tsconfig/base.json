@@ -16,7 +16,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "preact",
+    "jsxImportSource": "react",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,

@@ -9,7 +9,7 @@ Live at [tools.bhimraj.com.np](https://tools.bhimraj.com.np).
 
 ```
 apps/
-  web/          Astro static site: one page per tool and per form (/forms/{cc}/{org}/{form})
+  web/          Astro static site with React islands: one page per tool and per form (/forms/{cc}/{org}/{form})
 packages/
   image/        in-browser image processing in a worker (later siblings: pdf, carbon)
   presets/      sourced registry of form size rules: pixels, KB limits, format, background

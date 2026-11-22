@@ -10,7 +10,7 @@ Status: accepted (2026-11-17)
   `bun fmt` and `bun check` skip `.astro` files: `astro check` type-checks them and
   they are formatted by hand. No root script may be named `fmt` or `check`, or the
   built-in runs that script instead.
-- **Astro 7, static output, Preact islands, Tailwind 4.** Pages ship no JavaScript
+- **Astro 7, static output, Preact islands, Tailwind 4.** (Preact superseded by React; see 0005.) Pages ship no JavaScript
   by default; only the tool island hydrates. Hundreds of preset pages come from
   `getStaticPaths` over `@tools/presets`. Next.js static export was rejected: it
   sends a React runtime to every page and its server features go unused.

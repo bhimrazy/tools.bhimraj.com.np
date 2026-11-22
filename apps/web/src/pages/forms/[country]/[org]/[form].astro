@@ -1,10 +1,23 @@
 ---
+// Devanagari and Bengali faces: the browser fetches a file only when its script appears (unicode-range).
+import "@fontsource-variable/noto-sans-devanagari/wght.css";
+import "@fontsource-variable/noto-sans-bengali/wght.css";
 import { formPath, groupByForm, maxBytesToKb, toCompressOptions, uploadPath, type Preset } from "@tools/presets";
 import { reportRuleUrl } from "@tools/site";
 import type { GetStaticPaths } from "astro";
+import { StatusGlyph } from "../../../../components/brand/StatusGlyph";
 import CompressIsland from "../../../../components/CompressIsland.astro";
 import Base from "../../../../layouts/Base.astro";
-import { countryName, FORMAT_LABEL, formatByteRange, formatDate, formatDimensions } from "../../../../lib/format";
+import {
+  countryName,
+  FORMAT_LABEL,
+  formatByteRange,
+  formatChecked,
+  formatDate,
+  formatDimensions,
+  formatSizeRule,
+  getNativeCountry,
+} from "../../../../lib/format";
 
 // One page per form; each upload it asks for is a section, linked as #{upload}.
 export const getStaticPaths = (() =>
@@ -21,129 +34,151 @@ const { uploads } = Astro.props;
 const first = uploads[0]!;
 const path = formPath(first);
 const portalName = first.portal.replace(/\s*\(.*\)$/, "");
+const native = getNativeCountry(first.country);
 
 const sections = uploads.map((preset) => {
   const { rule } = preset;
   const dims = formatDimensions(rule);
   const size = formatByteRange(rule);
   const bg = rule.background && (/^#f{3}(f{3})?$/i.test(rule.background) ? "white" : rule.background);
-  return { preset, rule, dims, size, bg, options: toCompressOptions(rule) };
+  const facts: [string, string][] = [
+    ...(dims ? [["Width and height", dims] as [string, string]] : []),
+    ["File size", size],
+    ["Format", FORMAT_LABEL[rule.format]],
+    ...(bg ? [["Background", bg] as [string, string]] : []),
+  ];
+  return { preset, rule, dims, size, bg, facts, options: toCompressOptions(rule) };
 });
 
 const description = `Make your ${first.formTitle} ${sections
   .map(({ preset, dims, size }) => `${preset.kind} (${[dims, size].filter(Boolean).join(", ")})`)
-  .join(" and ")}, ready to upload to ${portalName}. Runs on your device; nothing is uploaded.`;
+  .join(" and ")}, ready to upload to ${portalName}. It runs on your device, so nothing is uploaded.`;
 ---
 
-<Base title={first.formTitle} {description} path={path}>
-  <nav aria-label="Breadcrumb" class="pb-3 text-sm text-muted">
-    <a href="/">Tools</a> <span aria-hidden="true">/</span> {countryName(first.country)}
+<Base title={first.formTitle} {description} path={path} section="forms">
+  <nav aria-label="Breadcrumb" class="mb-3 flex flex-wrap gap-1.5 text-[13px] text-muted-foreground">
+    <a href="/" class="text-muted-foreground no-underline">Home</a><span aria-hidden="true">/</span>
+    <a href="/#forms" class="text-muted-foreground no-underline">Forms</a><span aria-hidden="true">/</span>
+    <span>
+      {countryName(first.country)}{" "}
+      {native && <span class={native.script} lang={native.lang}>{native.name}</span>}
+    </span>
   </nav>
-  <div class="grid gap-2 pb-5">
-    <h1 class="text-2xl tracking-tight sm:text-3xl">{first.formTitle}</h1>
-    <p class="text-muted">For {first.portal}.</p>
-    {
-      sections.length > 1 && (
-        <nav aria-label="Uploads on this page" class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          {sections.map(({ preset }) => (
-            <a href={`#${preset.upload}`}>{preset.title}</a>
-          ))}
-        </nav>
-      )
-    }
-  </div>
+  <h1 class="t-h1">{first.formTitle}</h1>
+  <p class="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">
+    <span>For {portalName}</span><span aria-hidden="true">·</span><span>Your files stay on this device</span>
+  </p>
+  {
+    sections.length > 1 && (
+      <nav aria-label="Uploads on this page" class="mt-4 flex flex-wrap gap-1.5">
+        {sections.map(({ preset }) => (
+          <a
+            href={`#${preset.upload}`}
+            class="inline-flex min-h-11 items-center rounded-full border border-input bg-card px-3.5 text-sm font-[520] text-ink no-underline hover:bg-muted sm:min-h-10"
+          >
+            {preset.kind.charAt(0).toUpperCase() + preset.kind.slice(1)}
+          </a>
+        ))}
+      </nav>
+    )
+  }
 
   {
-    sections.map(({ preset, rule, dims, size, bg, options }) => (
-      <section id={preset.upload} aria-labelledby={`${preset.upload}-heading`} class="grid gap-4 pt-8">
-        <div class="grid gap-1">
-          <h2 id={`${preset.upload}-heading`} class="text-xl tracking-tight">
-            {preset.title}
-          </h2>
-          {preset.verifiedAt === null ? (
-            <p class="flex flex-wrap items-center gap-2 text-sm">
-              <span class="badge badge-warning">Not checked yet</span>
-              <span class="text-muted">Check the official notice before you submit.</span>
-            </p>
-          ) : (
-            <p class="flex flex-wrap items-center gap-2 text-sm">
-              <span class="badge badge-success">Checked {formatDate(preset.verifiedAt)}</span>
-            </p>
-          )}
-        </div>
+    sections.map(({ preset, rule, dims, size, bg, facts, options }) => (
+      <section
+        id={preset.upload}
+        aria-labelledby={`${preset.upload}-heading`}
+        class="mt-8 scroll-mt-4 border-t border-line pt-6 first-of-type:border-t-0 md:mt-10"
+      >
+        <h2 id={`${preset.upload}-heading`} class="t-h2">
+          {preset.title}
+        </h2>
+        <p class="num mt-1 mb-4 flex flex-wrap gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground md:mb-5">
+          <span translate="no">{formatSizeRule(rule)}</span>
+          <span aria-hidden="true">·</span>
+          <span class:list={[preset.verifiedAt && "text-ink"]}>{formatChecked(preset)}</span>
+        </p>
+
+        {preset.verifiedAt === null && (
+          <p class="mb-4 flex items-start gap-2.5 rounded-lg bg-sunk px-3.5 py-3 text-sm md:mb-5">
+            <StatusGlyph status="unv" className="mt-px size-5 shrink-0 text-status-warn" />
+            <span>
+              <b>Not checked yet.</b> These numbers come from{" "}
+              {preset.source ? preset.source.label.toLowerCase() : "no source we could confirm"}. Check your notice
+              before you submit.
+            </span>
+          </p>
+        )}
 
         {options ? (
-          <CompressIsland rule={options} kind={preset.kind} id={preset.upload} />
+          <CompressIsland rule={options} kind={preset.kind} id={preset.upload} verified={preset.verifiedAt !== null} />
         ) : (
-          <p class="card p-4">
-            {FORMAT_LABEL[rule.format]} output isn't supported yet. Use the size rule below with the{" "}
+          <p class="rounded-xl border border-line bg-card p-4">
+            {FORMAT_LABEL[rule.format]} files can't be made here yet. Use the size rule below with the{" "}
             <a href="/compress-image">image compressor</a>.
           </p>
         )}
 
-        <div role="group" aria-labelledby={`${preset.upload}-rule-heading`} class="card mt-6 grid gap-3 p-4 sm:p-6">
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 id={`${preset.upload}-rule-heading`} class="text-lg">
+        <div class="mt-8 grid items-start gap-8 md:grid-cols-2">
+          <div
+            role="group"
+            aria-labelledby={`${preset.upload}-rule-heading`}
+            class="rounded-xl border border-line bg-card p-4 md:p-5"
+          >
+            <h3 id={`${preset.upload}-rule-heading`} class="t-h3">
               Size rule
             </h3>
-            <span class="font-mono text-xs text-muted">{preset.id}</span>
-          </div>
-          <dl class="facts text-sm">
-            {dims && (
-              <div>
-                <dt>Size</dt>
-                <dd>{dims}</dd>
-              </div>
-            )}
-            <div>
-              <dt>File size</dt>
-              <dd>{size}</dd>
-            </div>
-            <div>
-              <dt>Format</dt>
-              <dd>{FORMAT_LABEL[rule.format]}</dd>
-            </div>
-            {bg && (
-              <div>
-                <dt>Background</dt>
-                <dd class="capitalize">{bg}</dd>
-              </div>
-            )}
-          </dl>
-          <div class="grid gap-1 border-t border-border pt-3 text-muted text-sm">
-            {preset.source ? (
+            <dl class="mt-2 text-sm">
+              {facts.map(([k, v]) => (
+                <div class="flex justify-between gap-4 border-b border-line py-2 last:border-b-0">
+                  <dt class="text-muted-foreground">{k}</dt>
+                  <dd class:list={["num text-right", k === "Background" && "capitalize"]} translate="no">
+                    {v}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div class="mt-2 grid gap-1 border-t border-line pt-3 text-[13px] text-muted-foreground">
               <p>
                 Source:{" "}
-                <a href={preset.source.url} rel="noopener noreferrer external">
-                  {preset.source.label}
-                </a>
+                {preset.source ? (
+                  <a href={preset.source.url} rel="noopener noreferrer external">
+                    {preset.source.label}
+                  </a>
+                ) : (
+                  "none we could confirm yet."
+                )}
               </p>
-            ) : (
-              <p>Source: none we could confirm yet.</p>
-            )}
-            <p>
-              {preset.verifiedAt
-                ? `Checked ${formatDate(preset.verifiedAt)}.`
-                : "Not checked against an official notice yet."}{" "}
-              <a href={reportRuleUrl(preset.title, uploadPath(preset))} rel="noopener noreferrer external">
+              <p>
+                {preset.verifiedAt
+                  ? `Checked ${formatDate(preset.verifiedAt)}.`
+                  : "Not checked against an official notice yet."}
+              </p>
+              <a
+                class="inline-flex min-h-11 items-center text-sm font-[550]"
+                href={reportRuleUrl(preset.title, uploadPath(preset))}
+                rel="noopener noreferrer external"
+              >
                 Report a different rule
               </a>
+            </div>
+          </div>
+          <div class="grid gap-3">
+            <h3 class="t-h3">About this {preset.kind}</h3>
+            {preset.notes && <p class="text-[15px] text-ink-2">{preset.notes}</p>}
+            <p class="text-[15px] text-ink-2">
+              Add your {preset.kind} and it is{" "}
+              {rule.fit === "contain"
+                ? `fitted inside ${dims ?? "the size the form asks for"} without cutting anything off`
+                : `cropped from the centre to ${dims ?? "the size the form asks for"}`}
+              {bg && `, on a ${bg} background,`} and made{" "}
+              {rule.minBytes === undefined ? `${maxBytesToKb(rule.maxBytes)} KB or less` : size}. Your browser does
+              all of it, so the file never leaves your device.
+            </p>
+            <p class="text-[13px] text-muted-foreground">
+              Tip: crop your {preset.kind} roughly to shape first, so nothing that matters is lost.
             </p>
           </div>
-        </div>
-
-        <div class="mt-4 grid max-w-prose gap-3">
-          <h3 class="text-lg">About this {preset.kind}</h3>
-          {preset.notes && <p>{preset.notes}</p>}
-          <p>
-            Pick your {preset.kind} and it is cropped from the centre to {dims ?? "the required size"}
-            {bg && `, placed on a ${bg} background,`} and compressed to{" "}
-            {rule.minBytes === undefined ? `${maxBytesToKb(rule.maxBytes)} KB or less` : size}. Everything runs in your
-            browser, so the file never leaves your device.
-          </p>
-          <p class="text-sm text-muted">
-            Tip: crop your {preset.kind} roughly to shape first so the centre crop keeps what matters.
-          </p>
         </div>
       </section>
     ))

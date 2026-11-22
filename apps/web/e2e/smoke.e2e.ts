@@ -34,7 +34,7 @@ for (const p of pages) {
 test("tool pages show the upload control", async ({ page }) => {
   await page.goto("/compress-image");
   await expect(page.getByLabel(/^Choose/)).toBeAttached();
-  await expect(page.getByLabel("Largest size (KB)")).toHaveValue("100");
+  await expect(page.getByLabel("Size limit (KB)")).toHaveValue("100");
 });
 
 test("unknown path serves the 404 page", async ({ page }) => {
