@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Preset } from "./index";
 
-// Byte limits carry ~1% headroom via kbMax/kbMin (see bytes.ts); zod-validated data, tests and build only.
+// Byte limits carry ~1% headroom via kbToMaxBytes/kbToMinBytes (see bytes.ts); zod-validated data, tests and build only.
 
 const dim = z.number().int().positive();
 const isoDate = z
@@ -20,7 +20,7 @@ export const presetSchema = z
     portal: z.string().min(1),
     title: z.string().min(1),
     kind: z.enum(["photo", "signature", "scan"]),
-    output: z.strictObject({
+    rule: z.strictObject({
       format: z.enum(["image/jpeg", "image/webp"]),
       width: dim.optional(),
       height: dim.optional(),
@@ -47,12 +47,11 @@ export const presetSchema = z
     "path prefix must equal country",
   )
   .refine(
-    (p) =>
-      p.output.minBytes === undefined || p.output.minBytes < p.output.maxBytes,
+    (p) => p.rule.minBytes === undefined || p.rule.minBytes < p.rule.maxBytes,
     "minBytes must be < maxBytes",
   )
   .refine(
-    (p) => p.kind === "photo" || p.output.fit === "contain",
+    (p) => p.kind === "photo" || p.rule.fit === "contain",
     "signatures and scans must use fit contain",
   )
   .refine(
@@ -62,8 +61,9 @@ export const presetSchema = z
 
 // Compile-time drift check: every Preset must satisfy the schema's output type
 // (zod's optional adds `| undefined`, which exactOptionalPropertyTypes rejects the other way).
-export const _presetFitsSchema = (p: Preset): z.output<typeof presetSchema> =>
-  p;
+export const _presetMatchesSchema = (
+  p: Preset,
+): z.output<typeof presetSchema> => p;
 
 export function validatePresets(list: readonly unknown[]): Preset[] {
   const out = list.map((p) => presetSchema.parse(p) as Preset);

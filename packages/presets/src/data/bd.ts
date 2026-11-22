@@ -1,5 +1,5 @@
 import type { Preset } from "../index";
-import { kbMax } from "../bytes";
+import { kbToMaxBytes } from "../bytes";
 
 const common = {
   country: "BD",
@@ -17,12 +17,12 @@ export const bd: Preset[] = [
     path: "bd/teletalk-photo",
     title: "Teletalk job application photo",
     kind: "photo",
-    output: {
+    rule: {
       format: "image/jpeg",
       fit: "cover",
       width: 300,
       height: 300,
-      maxBytes: kbMax(100),
+      maxBytes: kbToMaxBytes(100),
       background: "#ffffff",
     },
     notes: caveat,
@@ -33,12 +33,12 @@ export const bd: Preset[] = [
     path: "bd/teletalk-signature",
     title: "Teletalk job application signature",
     kind: "signature",
-    output: {
+    rule: {
       format: "image/jpeg",
       fit: "contain",
       width: 300,
       height: 80,
-      maxBytes: kbMax(60),
+      maxBytes: kbToMaxBytes(60),
       background: "#ffffff",
     },
     notes: caveat,

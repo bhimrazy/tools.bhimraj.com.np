@@ -1,23 +1,23 @@
-import type { ImageFormat, Preset } from "@tools/presets";
+import type { OutputFormat, Preset } from "@tools/presets";
 import { statedMaxKb, statedMinKb } from "./units";
 
 const regions = new Intl.DisplayNames(["en"], { type: "region" });
 export const countryName = (code: string) => regions.of(code) ?? code;
 
-export const FORMAT_LABEL: Record<ImageFormat, string> = {
+export const FORMAT_LABEL: Record<OutputFormat, string> = {
   "image/jpeg": "JPEG (.jpg)",
   "image/webp": "WebP",
 };
 
 export function sizeRange(p: Preset): string {
-  const { minBytes, maxBytes } = p.output;
+  const { minBytes, maxBytes } = p.rule;
   return minBytes === undefined
     ? `up to ${statedMaxKb(maxBytes)} KB`
     : `${statedMinKb(minBytes)}–${statedMaxKb(maxBytes)} KB`;
 }
 
 export function dimensions(p: Preset): string | null {
-  const { width, height } = p.output;
+  const { width, height } = p.rule;
   if (width && height) return `${width} × ${height} px`;
   if (width) return `${width} px wide`;
   if (height) return `${height} px tall`;

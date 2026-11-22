@@ -129,7 +129,7 @@ export function presetJobs(): JobSpec[] {
   ] as const) {
     const p = presets.find((x) => x.id === id);
     if (!p) continue;
-    const o = p.output;
+    const o = p.rule;
     out.push({
       input,
       label: `${id} ${o.width}x${o.height}`,

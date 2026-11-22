@@ -1,5 +1,5 @@
 import type { Preset } from "../index";
-import { kbMax } from "../bytes";
+import { kbToMaxBytes } from "../bytes";
 
 export const us: Preset[] = [
   {
@@ -9,12 +9,12 @@ export const us: Preset[] = [
     portal: "Diversity Visa Program (dvprogram.state.gov)",
     title: "US DV Lottery entry photo",
     kind: "photo",
-    output: {
+    rule: {
       format: "image/jpeg",
       fit: "cover",
       width: 600,
       height: 600,
-      maxBytes: kbMax(240),
+      maxBytes: kbToMaxBytes(240),
       background: "#ffffff",
     },
     source: {

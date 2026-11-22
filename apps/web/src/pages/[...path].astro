@@ -1,5 +1,5 @@
 ---
-import { presets, presetToCompressOptions, type Preset } from "@tools/presets";
+import { presets, toCompressOptions, type Preset } from "@tools/presets";
 import type { GetStaticPaths } from "astro";
 import CompressIsland from "../components/CompressIsland.astro";
 import type { ToolSpec } from "../components/CompressTool";
@@ -16,13 +16,13 @@ interface Props {
 }
 
 const { preset } = Astro.props;
-const { output } = preset;
+const { rule: output } = preset;
 const dims = dimensions(preset);
 const size = sizeRange(preset);
 const path = `/${preset.path}`;
 const bg = output.background && (/^#f{3}(f{3})?$/i.test(output.background) ? "white" : output.background);
 
-const spec: ToolSpec = presetToCompressOptions(preset);
+const spec: ToolSpec = toCompressOptions(preset.rule);
 
 const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].filter(Boolean).join(", ")}, ready to upload to ${preset.portal.replace(/\s*\(.*\)$/, "")}. Runs on your device; nothing is uploaded.`;
 ---

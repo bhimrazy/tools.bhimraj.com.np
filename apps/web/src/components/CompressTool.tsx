@@ -9,7 +9,7 @@ import type {
   TargetedEvent,
   TargetedSubmitEvent,
 } from "preact";
-import { kbMax } from "@tools/presets";
+import { kbToMaxBytes } from "@tools/presets";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
   formatBytes,
@@ -84,7 +84,7 @@ function genericSpec(kb: string, w: string, h: string): ToolSpec {
   const out: ToolSpec = {
     format: "image/jpeg",
     // Same 1% headroom as presets, so the stated limit reads back as typed.
-    maxBytes: kbMax(positive(kb) ?? DEFAULT_KB),
+    maxBytes: kbToMaxBytes(positive(kb) ?? DEFAULT_KB),
   };
   const width = positive(w);
   const height = positive(h);

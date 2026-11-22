@@ -1,6 +1,6 @@
-import { MAX_HEADROOM, MIN_MARGIN } from "@tools/presets";
+import { MAX_BYTES_HEADROOM, MIN_BYTES_HEADROOM } from "@tools/presets";
 
-// Matches @tools/presets kbMax/kbMin: caps are KB x 1000 and floors KB x 1024, each with ~1% headroom.
+// Matches @tools/presets kbToMaxBytes/kbMin: caps are KB x 1000 and floors KB x 1024, each with ~1% headroom.
 // Displaying undoes the headroom to show the portal's number.
 export const KB_MAX = 1000;
 export const KB_MIN = 1024;
@@ -11,9 +11,9 @@ const trim = (n: number) => {
 };
 
 export const statedMaxKb = (bytes: number) =>
-  trim(bytes / (KB_MAX * MAX_HEADROOM));
+  trim(bytes / (KB_MAX * MAX_BYTES_HEADROOM));
 export const statedMinKb = (bytes: number) =>
-  trim(bytes / (KB_MIN * MIN_MARGIN));
+  trim(bytes / (KB_MIN * MIN_BYTES_HEADROOM));
 
 /** Result sizes use the cap's factor so "≤ 200 KB" and "198.4 KB" compare directly. */
 export function formatKb(bytes: number): string {

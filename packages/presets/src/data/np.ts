@@ -1,5 +1,5 @@
 import type { Preset } from "../index";
-import { kbMax, kbMin } from "../bytes";
+import { kbToMaxBytes, kbToMinBytes } from "../bytes";
 
 // Figures come from an applicant-guide site, not an official PSC notice; official pages gave no sizes.
 const source = {
@@ -20,13 +20,13 @@ export const np: Preset[] = [
     path: "np/lok-sewa-photo",
     title: "Lok Sewa Aayog online application photo",
     kind: "photo",
-    output: {
+    rule: {
       format: "image/jpeg",
       fit: "cover",
       width: 300,
       height: 350,
-      minBytes: kbMin(10),
-      maxBytes: kbMax(200),
+      minBytes: kbToMinBytes(10),
+      maxBytes: kbToMaxBytes(200),
       background: "#ffffff",
     },
     notes:
@@ -38,13 +38,13 @@ export const np: Preset[] = [
     path: "np/lok-sewa-signature",
     title: "Lok Sewa Aayog online application signature",
     kind: "signature",
-    output: {
+    rule: {
       format: "image/jpeg",
       fit: "contain",
       width: 300,
       height: 80,
-      minBytes: kbMin(5),
-      maxBytes: kbMax(100),
+      minBytes: kbToMinBytes(5),
+      maxBytes: kbToMaxBytes(100),
       background: "#ffffff",
     },
     notes:
