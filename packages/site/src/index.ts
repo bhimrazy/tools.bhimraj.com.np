@@ -1,6 +1,7 @@
 import { DEFAULT_SITE_ORIGIN } from "./origin";
 
 export { DEFAULT_SITE_ORIGIN } from "./origin";
+export { NEW_ISSUE_URL, REPO_URL, reportRuleUrl } from "./links";
 
 export interface Alternate {
   hreflang: string;
@@ -46,7 +47,7 @@ export function absoluteUrl(path: string, origin: URL = siteOrigin()): string {
 }
 
 /** hreflang alternates for a path; `x-default` is the unprefixed path. */
-export function alternates(
+export function hreflangAlternates(
   path: string,
   locales: readonly { hreflang: string; prefix: string }[],
   origin: URL = siteOrigin(),
