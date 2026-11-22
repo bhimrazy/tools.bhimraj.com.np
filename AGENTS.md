@@ -27,7 +27,12 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
   refuses releases younger than 7 days; don't bypass it.
 - CI actions are pinned to full commit SHAs with a version comment.
 - Rust/WASM only for a measured hot path; see `docs/adr/0004-rust-wasm.md`.
-- Research and business notes go in `.research/` (gitignored), never in the repo.
+- Research and business notes go in `.research/` (gitignored). No strategy, market or revenue detail in commits,
+  PRs, issues or `.claude/`.
+- Third-party references (competitor or reference sites and repos, screenshots, inspiration notes) also live
+  only in `.research/`. Code, comments, docs, ADRs, PRs and issues describe our own decisions without naming them.
+  Preset `source` links are citations, not references, and stay.
+- Agent roles live in `.claude/agents/`; `/review-round` runs the CTO, CEO, security, product and SEO reviewers.
 
 ## Validation
 
