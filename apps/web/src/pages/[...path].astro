@@ -1,12 +1,10 @@
 ---
-import { presets, toCompressOptions, type Preset } from "@tools/presets";
+import { maxBytesToKb, presets, toCompressOptions, type Preset } from "@tools/presets";
 import type { GetStaticPaths } from "astro";
 import CompressIsland from "../components/CompressIsland.astro";
-import type { ToolSpec } from "../components/CompressTool";
 import Base from "../layouts/Base.astro";
 import { reportRuleUrl } from "@tools/site";
-import { statedMaxKb } from "../lib/units";
-import { countryName, dimensions, FORMAT_LABEL, formatDate, sizeRange } from "../lib/format";
+import { countryName, FORMAT_LABEL, formatByteRange, formatDate, formatDimensions } from "../lib/format";
 
 export const getStaticPaths = (() =>
   presets.map((preset) => ({ params: { path: preset.path }, props: { preset } }))) satisfies GetStaticPaths;
@@ -16,13 +14,13 @@ interface Props {
 }
 
 const { preset } = Astro.props;
-const { rule: output } = preset;
-const dims = dimensions(preset);
-const size = sizeRange(preset);
+const { rule } = preset;
+const dims = formatDimensions(rule);
+const size = formatByteRange(rule);
 const path = `/${preset.path}`;
-const bg = output.background && (/^#f{3}(f{3})?$/i.test(output.background) ? "white" : output.background);
+const bg = rule.background && (/^#f{3}(f{3})?$/i.test(rule.background) ? "white" : rule.background);
 
-const spec: ToolSpec = toCompressOptions(preset.rule);
+const options = toCompressOptions(rule);
 
 const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].filter(Boolean).join(", ")}, ready to upload to ${preset.portal.replace(/\s*\(.*\)$/, "")}. Runs on your device; nothing is uploaded.`;
 ---
@@ -50,11 +48,11 @@ const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].fil
   </div>
 
   {
-    spec ? (
-      <CompressIsland spec={spec} kind={preset.kind} />
+    options ? (
+      <CompressIsland rule={options} kind={preset.kind} />
     ) : (
       <p class="card p-4">
-        {FORMAT_LABEL[output.format]} output isn't supported yet. Use the spec below with the{" "}
+        {FORMAT_LABEL[rule.format]} output isn't supported yet. Use the spec below with the{" "}
         <a href="/compress-image">image compressor</a>.
       </p>
     )
@@ -65,7 +63,7 @@ const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].fil
       <h2 id="spec-heading" class="text-lg">The spec</h2>
       <span class="font-mono text-xs text-muted">{preset.id}</span>
     </div>
-    <dl class="kv text-sm">
+    <dl class="facts text-sm">
       {
         dims && (
           <div>
@@ -80,7 +78,7 @@ const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].fil
       </div>
       <div>
         <dt>Format</dt>
-        <dd>{FORMAT_LABEL[output.format]}</dd>
+        <dd>{FORMAT_LABEL[rule.format]}</dd>
       </div>
       {
         bg && (
@@ -113,7 +111,7 @@ const description = `Make your ${preset.title.toLowerCase()}: ${[dims, size].fil
     {preset.notes && <p>{preset.notes}</p>}
     <p>
       Pick your {preset.kind} and it is cropped from the centre to {dims ?? "the required size"}{bg && `, placed on a ${bg} background,`}{" "}
-      and compressed to {output.minBytes === undefined ? `${statedMaxKb(output.maxBytes)} KB or less` : size}. Everything runs
+      and compressed to {rule.minBytes === undefined ? `${maxBytesToKb(rule.maxBytes)} KB or less` : size}. Everything runs
       in your browser, so the file never leaves your device.
     </p>
     <p class="text-sm text-muted">

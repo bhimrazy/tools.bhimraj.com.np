@@ -2,37 +2,27 @@ import type {
   CompressOptions,
   CompressResult,
   ImageWorker,
-  OutputFormat,
 } from "@tools/image";
 import type {
   TargetedDragEvent,
   TargetedEvent,
   TargetedSubmitEvent,
 } from "preact";
-import { kbToMaxBytes } from "@tools/presets";
-import { useEffect, useRef, useState } from "preact/hooks";
 import {
-  formatBytes,
-  formatKb,
-  KB_MAX,
-  statedMaxKb,
-  statedMinKb,
-} from "../lib/units";
-
-export interface ToolSpec {
-  format: OutputFormat;
-  maxBytes: number;
-  minBytes?: number;
-  width?: number;
-  height?: number;
-  fit?: "cover" | "contain";
-  background?: string;
-}
+  KB,
+  kbToMaxBytes,
+  maxBytesToKb,
+  minBytesToKb,
+  type SizeRule,
+  type UploadKind,
+} from "@tools/presets";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { formatBytes, formatFileSize } from "../lib/units";
 
 export interface CompressToolProps {
-  /** Fixed spec (preset pages). Omitted: the generic tool with editable target size. */
-  spec?: ToolSpec;
-  kind?: "photo" | "signature" | "scan";
+  /** Fixed size rule (form pages). Omitted: the generic tool with an editable target size. */
+  rule?: SizeRule;
+  kind?: UploadKind;
 }
 
 interface Original {
@@ -45,7 +35,7 @@ interface Original {
 type Result = CompressResult & { url: string; filename: string };
 
 const INPUT_ID = "compress-file";
-const DEFAULT_KB = 100;
+const DEFAULT_MAX_KB = 100;
 
 const isHeic = (f: File) =>
   /hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
@@ -80,11 +70,12 @@ const positive = (v: string) => {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
 };
 
-function genericSpec(kb: string, w: string, h: string): ToolSpec {
-  const out: ToolSpec = {
+function customRule(kb: string, w: string, h: string): SizeRule {
+  const out: SizeRule = {
     format: "image/jpeg",
+    fit: "cover",
     // Same 1% headroom as presets, so the stated limit reads back as typed.
-    maxBytes: kbToMaxBytes(positive(kb) ?? DEFAULT_KB),
+    maxBytes: kbToMaxBytes(positive(kb) ?? DEFAULT_MAX_KB),
   };
   const width = positive(w);
   const height = positive(h);
@@ -93,8 +84,8 @@ function genericSpec(kb: string, w: string, h: string): ToolSpec {
   return out;
 }
 
-export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
-  const [kb, setKb] = useState(String(DEFAULT_KB));
+export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
+  const [kb, setKb] = useState(String(DEFAULT_MAX_KB));
   const [w, setW] = useState("");
   const [h, setH] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -109,7 +100,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
   const job = useRef<AbortController | null>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
 
-  const target: ToolSpec = spec ?? genericSpec(kb, w, h);
+  const target: SizeRule = rule ?? customRule(kb, w, h);
 
   useEffect(() => {
     if (!result) return;
@@ -139,7 +130,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
     return () => document.removeEventListener("paste", onPaste);
   });
 
-  async function run(next: File, opts: ToolSpec = target) {
+  async function run(next: File, opts: SizeRule = target) {
     job.current?.abort();
     const ctrl = new AbortController();
     job.current = ctrl;
@@ -165,17 +156,17 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
         const { createImageWorker } = await import("@tools/image");
         worker.current = createImageWorker();
       }
-      const options: CompressOptions = { fit: "cover", ...opts };
+      const options: CompressOptions = opts;
       const out = await worker.current.compress(next, options, ctrl.signal);
       if (ctrl.signal.aborted) return;
 
       const ext = out.format === "image/webp" ? "webp" : "jpg";
-      const filename = `${stem(next.name)}-${out.width}x${out.height}-${Math.round(out.bytes / KB_MAX)}kb.${ext}`;
+      const filename = `${stem(next.name)}-${out.width}x${out.height}-${Math.round(out.bytes / KB)}kb.${ext}`;
       setResult({ ...out, url: URL.createObjectURL(out.blob), filename });
       setStatus(
         out.fitsBytes
-          ? `Done: ${formatKb(out.bytes)}, ${out.width} × ${out.height} px. Ready to download.`
-          : `Done, but the file is ${formatKb(out.bytes)}, still over the limit.`,
+          ? `Done: ${formatFileSize(out.bytes)}, ${out.width} × ${out.height} px. Ready to download.`
+          : `Done, but the file is ${formatFileSize(out.bytes)}, still over the limit.`,
       );
       requestAnimationFrame(() => resultHeading.current?.focus());
     } catch (err) {
@@ -216,13 +207,13 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
 
   const boxW = target.width ?? 4;
   const boxH = target.height ?? (target.width ? target.width : 5);
-  const limit = spec?.minBytes
-    ? `${statedMinKb(spec.minBytes)}–${statedMaxKb(target.maxBytes)} KB`
-    : `≤ ${statedMaxKb(target.maxBytes)} KB`;
+  const limit = rule?.minBytes
+    ? `${minBytesToKb(rule.minBytes)}–${maxBytesToKb(target.maxBytes)} KB`
+    : `≤ ${maxBytesToKb(target.maxBytes)} KB`;
 
   return (
     <div class="grid gap-4">
-      {!spec && (
+      {!rule && (
         <form class="grid grid-cols-3 gap-3 sm:max-w-md" onSubmit={onSettings}>
           <label class="col-span-3 grid gap-1.5 text-sm font-medium sm:col-span-1">
             Max size (KB)
@@ -384,18 +375,19 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
             class="mx-auto h-auto max-h-72 w-auto max-w-full rounded-sm border border-border bg-subtle"
           />
           <div class="grid content-start gap-4">
-            <dl class="kv text-sm">
+            <dl class="facts text-sm">
               <div>
                 <dt>Original</dt>
                 <dd>
-                  {formatKb(original.bytes)} · {original.width}×
+                  {formatFileSize(original.bytes)} · {original.width}×
                   {original.height}
                 </dd>
               </div>
               <div>
                 <dt>Result</dt>
                 <dd class="font-semibold">
-                  {formatKb(result.bytes)} · {result.width}×{result.height}
+                  {formatFileSize(result.bytes)} · {result.width}×
+                  {result.height}
                 </dd>
               </div>
               <div>

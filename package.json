@@ -25,7 +25,7 @@
     "check:host": "bun scripts/check-host.ts",
     "prepare": "git config core.hooksPath .githooks",
     "verify": "bun fmt --check && bun run check:host && bun audit --audit-level=high && bun run typecheck && bun test && bun run build",
-    "e2e": "bun run --filter @tools/web test:e2e",
+    "e2e": "bun run --filter @tools/web e2e",
     "bench": "bun run --filter @tools/bench bench"
   },
   "devDependencies": {

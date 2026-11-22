@@ -1,12 +1,12 @@
 ---
 import type { Preset } from "@tools/presets";
-import { dimensions, sizeRange } from "../lib/format";
+import { formatByteRange, formatDimensions } from "../lib/format";
 
 interface Props {
   preset: Preset;
 }
 const { preset } = Astro.props;
-const dims = dimensions(preset);
+const dims = formatDimensions(preset.rule);
 ---
 
 <a href={`/${preset.path}`} class="card grid h-full gap-1 p-4">
@@ -15,5 +15,5 @@ const dims = dimensions(preset);
     {preset.verifiedAt === null && <span class="badge badge-warning">Unverified</span>}
   </span>
   <span class="text-sm text-muted">{preset.portal}</span>
-  <span class="mt-2 font-mono text-xs text-muted">{[dims, sizeRange(preset)].filter(Boolean).join(" · ")}</span>
+  <span class="mt-2 font-mono text-xs text-muted">{[dims, formatByteRange(preset.rule)].filter(Boolean).join(" · ")}</span>
 </a>

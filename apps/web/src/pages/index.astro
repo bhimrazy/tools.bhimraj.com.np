@@ -1,10 +1,10 @@
 ---
-import { presets } from "@tools/presets";
+import { groupByCountry } from "@tools/presets";
 import PresetCard from "../components/PresetCard.astro";
 import Base from "../layouts/Base.astro";
-import { countryName, groupByCountry } from "../lib/format";
+import { countryName, sortByCountryName } from "../lib/format";
 
-const groups = groupByCountry(presets);
+const groups = sortByCountryName(groupByCountry());
 ---
 
 <Base
