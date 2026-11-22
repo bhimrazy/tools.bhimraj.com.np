@@ -1,4 +1,4 @@
-export type GaugeState = "empty" | "pending" | "fit" | "over" | "under";
+export type GaugeState = "empty" | "pending" | "fits" | "over" | "under";
 
 /** Where the marker sits when the file is past the end of the scale (leaves room for the arrow). */
 export const OFF_SCALE_AT = 92;
@@ -13,7 +13,7 @@ export interface GaugeScale {
 }
 
 /** Converts byte limits and a size to rail percentages. */
-export function gaugeScale({
+export function computeGaugeScale({
   lo,
   hi,
   at,
@@ -36,12 +36,12 @@ export function gaugeScale({
   return out;
 }
 
-export function gaugeState(
+export function getGaugeState(
   bytes: number,
   maxBytes: number,
   minBytes?: number,
 ): GaugeState {
   if (bytes > maxBytes) return "over";
   if (minBytes !== undefined && bytes < minBytes) return "under";
-  return "fit";
+  return "fits";
 }

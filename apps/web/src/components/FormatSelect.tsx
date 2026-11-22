@@ -1,4 +1,4 @@
-import type { OutputFormat } from "@tools/engines/image";
+import type { OutputFormat } from "@tools/image";
 import {
   Select,
   SelectContent,

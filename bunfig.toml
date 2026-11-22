@@ -7,3 +7,7 @@ linker = "isolated"
 [fmt]
 # printWidth = 100
 # semi = false
+
+[test]
+# Playwright tests (*.e2e.ts) run via `bun run e2e`.
+pathIgnorePatterns = ["**/e2e/**"]

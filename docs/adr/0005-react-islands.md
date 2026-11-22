@@ -11,8 +11,12 @@ Status: accepted (2026-11-22). Supersedes the Preact choice in 0001; the rest of
   `apps/web/src/components/ui`; icons are `lucide-react`, imported one file per icon.
 - Islands are **not** hydrated with `client:*` directives. Those emit an inline `<script>` and
   `<style>` that `script-src 'self'; style-src 'self'` blocks. Instead `Island.astro` server-renders
-  the component with a fixed `useId` prefix, and a bundled module calls `hydrateRoot` with the same
-  prefix (`src/lib/hydrate.ts`). Ids from Base UI then match between server and client.
+  the component with a fixed `useId` prefix (unique per tool, since a form page holds one per upload),
+  and `hydrateRoot` uses the same prefix (`src/lib/hydrate.ts`). Ids from Base UI then match.
+- Island code loads **on first use**, not on page load (`src/lib/load-island.ts`): pointer, touch,
+  focus, key, drag or paste on the tool. The server HTML already works, so a file picked, dropped or
+  pasted before the code arrives is kept and handed to the tool when it mounts. This keeps a tool
+  page within the product standard of 50 KB gzip before a file is chosen.
 - Every island is wrapped in Base UI's `CSPProvider` with `disableStyleElements`, so it never
   inserts a `<style>`; the one rule it needs is in `global.css`.
 - Controls that server-render a `style=""` attribute (Base UI `Select`, `Slider`) are rendered only
@@ -29,16 +33,19 @@ these components.
 
 ## Cost
 
-JavaScript on a tool page, measured with `vite build` output (entry plus static imports):
+JavaScript on a tool page, measured on the built output (entry plus static imports):
 
-| Page                           | Before (Preact)       | After (React)         |
-| ------------------------------ | --------------------- | --------------------- |
-| Home, 404                      | 0                     | 0                     |
-| Compress, each preset: on load | 22.2 KiB (9.8 KiB gz) | 283 KiB (92.8 KiB gz) |
-| Same, loaded after first paint | 1.2 KiB (0.7 KiB gz)  | 86 KiB (29.8 KiB gz)  |
+| Page                             | Before (Preact)       | After (React)         |
+| -------------------------------- | --------------------- | --------------------- |
+| Home, 404                        | 0                     | 0                     |
+| Compress and form pages: on load | 22.2 KiB (9.8 KiB gz) | 3.1 KiB (1.5 KiB gz)  |
+| Same, on first use of the tool   | 1.2 KiB (0.7 KiB gz)  | 288 KiB (95.2 KiB gz) |
+| Same, after hydration (lazy)     | none                  | 143 KiB (49.1 KiB gz) |
 
-React DOM is about 68 KiB of the gzipped load. The format select and the exact-size tooltip (Base
-UI's positioning code) are split out with `React.lazy`. The image worker is unchanged.
+React DOM is about 68 KiB of the first-use load. The format select and the exact-size tooltip
+(Base UI's positioning code) load after hydration with `React.lazy`. The image worker is unchanged.
+The first-use load starts when someone touches the tool, which is usually before the file picker
+closes; on a slow connection the tool may need a moment to respond to its first click.
 
 `command` depends on `cmdk`, which pulls four Radix packages; it is installed for search but
 not yet used on any page, so none of it ships.

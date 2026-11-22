@@ -1,9 +1,12 @@
 import type { Preset } from "../index";
-import { kbMax } from "../schema";
+import { kbToMaxBytes } from "../bytes";
 
 const common = {
   country: "BD",
   portal: "Teletalk Alljobs (alljobs.teletalk.com.bd)",
+  org: "teletalk",
+  form: "job-application",
+  formTitle: "Teletalk job application",
   source: null,
   verifiedAt: null,
 } as const;
@@ -13,30 +16,32 @@ const caveat =
 export const bd: Preset[] = [
   {
     ...common,
-    id: "bd-teletalk-photo",
-    path: "bd/teletalk-photo",
+    id: "bd-teletalk-job-application-photo",
+    upload: "photo",
     title: "Teletalk job application photo",
     kind: "photo",
-    output: {
+    rule: {
       format: "image/jpeg",
+      fit: "cover",
       width: 300,
       height: 300,
-      maxBytes: kbMax(100),
+      maxBytes: kbToMaxBytes(100),
       background: "#ffffff",
     },
     notes: caveat,
   },
   {
     ...common,
-    id: "bd-teletalk-signature",
-    path: "bd/teletalk-signature",
+    id: "bd-teletalk-job-application-signature",
+    upload: "signature",
     title: "Teletalk job application signature",
     kind: "signature",
-    output: {
+    rule: {
       format: "image/jpeg",
+      fit: "contain",
       width: 300,
       height: 80,
-      maxBytes: kbMax(60),
+      maxBytes: kbToMaxBytes(60),
       background: "#ffffff",
     },
     notes: caveat,

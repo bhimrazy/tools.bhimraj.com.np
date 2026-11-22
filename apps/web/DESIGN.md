@@ -69,12 +69,12 @@ only on things that float. Buttons are 48px (`sm` 44px on phone, 40px from 640px
 - **Mark and lockup** (`Mark.tsx`): ring at 16,16, outer radius 15, inner 11; dot r 3.5 at
   20.5,16 (3 o'clock). Never move, centre or recolour the dot except to `signal-on-band` on the
   band. "by Bhimraj" is 55% of "Tools" on the same baseline; never drop or stack it.
-- **Status glyphs** (`StatusGlyph.tsx`): fit, work, no, err, unv, idle, all drawn from the ring.
+- **Status glyphs** (`StatusGlyph.tsx`): fits, work, no, err, unv, idle, all drawn from the ring.
   Always pair one with a word. The Fits glyph describes a file, never a size rule.
-- **Fit gauge** (`FitGauge.tsx`): SVG with percentage attributes, so it server-renders without a
+- **Fit gauge** (`FitsGauge.tsx`): SVG with percentage attributes, so it server-renders without a
   `style` attribute. The upper limit sits at two thirds; ticks above the marker; a file that fits
   is a sky circle, one that doesn't is a magenta diamond. Figures round down on a pass and up on a
-  fail (`figureKb`).
+  fail (`formatFigureKb`).
 - **Silhouette**: a form's upload shape at true proportion.
 
 Favicon and app icons in `public/` are the system's Logos files (app tile, maskable tile).
@@ -102,6 +102,7 @@ Check your notice before you submit." Sentence case, no exclamation marks, no em
 - CSP `style-src 'self'`: no `style=""` in server HTML and no `<style>` elements. Islands run inside
   Base UI's `CSPProvider` with `disableStyleElements`. Controls that server-render a style
   attribute (`Select`, `Slider`) render only after hydration.
-- Content pages ship no JavaScript; only tool islands hydrate (see `docs/adr/0005-react-islands.md`).
+- Content pages ship no JavaScript. Tool islands load their code on first use and must work as
+  server HTML until then (see `docs/adr/0005-react-islands.md`).
 - 44px tap targets, visible focus, AA contrast, 360px width, light and dark.
 - `prefers-reduced-motion` sets all durations to 0.

@@ -1,11 +1,10 @@
 import { z } from "zod";
 import type { Preset } from "./index";
 
-/** KB on portals is ambiguous: maxBytes = KB x 1000 and minBytes = KB x 1024 are safe either way. */
-export const kbMax = (kb: number): number => kb * 1000;
-export const kbMin = (kb: number): number => kb * 1024;
+// Byte limits carry ~1% headroom via kbToMaxBytes/kbToMinBytes (see bytes.ts); zod-validated data, tests and build only.
 
 const dim = z.number().int().positive();
+const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -16,16 +15,20 @@ const isoDate = z
 
 export const presetSchema = z
   .object({
-    id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
-    path: z.string().regex(/^[a-z]{2}\/[a-z0-9-]+$/),
+    id: slug,
     country: z.string().regex(/^[A-Z]{2}$/),
     portal: z.string().min(1),
+    org: slug,
+    form: slug,
+    formTitle: z.string().min(1),
+    upload: slug,
     title: z.string().min(1),
     kind: z.enum(["photo", "signature", "scan"]),
-    output: z.strictObject({
-      format: z.enum(["image/jpeg", "image/png", "image/webp"]),
+    rule: z.strictObject({
+      format: z.enum(["image/jpeg", "image/webp"]),
       width: dim.optional(),
       height: dim.optional(),
+      fit: z.enum(["cover", "contain"]),
       minBytes: dim.optional(),
       maxBytes: dim,
       background: z
@@ -44,13 +47,16 @@ export const presetSchema = z
   })
   .strict()
   .refine(
-    (p) => p.path.slice(0, 2) === p.country.toLowerCase(),
-    "path prefix must equal country",
+    (p) => p.id === `${p.country.toLowerCase()}-${p.org}-${p.form}-${p.upload}`,
+    "id must be {cc}-{org}-{form}-{upload}",
   )
   .refine(
-    (p) =>
-      p.output.minBytes === undefined || p.output.minBytes < p.output.maxBytes,
+    (p) => p.rule.minBytes === undefined || p.rule.minBytes < p.rule.maxBytes,
     "minBytes must be < maxBytes",
+  )
+  .refine(
+    (p) => p.kind === "photo" || p.rule.fit === "contain",
+    "signatures and scans must use fit contain",
   )
   .refine(
     (p) => p.verifiedAt === null || p.source !== null,
@@ -59,18 +65,23 @@ export const presetSchema = z
 
 // Compile-time drift check: every Preset must satisfy the schema's output type
 // (zod's optional adds `| undefined`, which exactOptionalPropertyTypes rejects the other way).
-export const _presetFitsSchema = (p: Preset): z.output<typeof presetSchema> =>
-  p;
+export const _presetMatchesSchema = (
+  p: Preset,
+): z.output<typeof presetSchema> => p;
 
 export function validatePresets(list: readonly unknown[]): Preset[] {
   const out = list.map((p) => presetSchema.parse(p) as Preset);
-  for (const key of ["id", "path"] as const) {
-    const seen = new Set<string>();
-    for (const p of out) {
-      if (seen.has(p[key]))
-        throw new Error(`duplicate preset ${key}: ${p[key]}`);
-      seen.add(p[key]);
-    }
+  const seen = new Set<string>();
+  const forms = new Map<string, Preset>();
+  for (const p of out) {
+    if (seen.has(p.id)) throw new Error(`duplicate preset id: ${p.id}`);
+    seen.add(p.id);
+    // One page per form, so its uploads must agree on what the page shows.
+    const key = `${p.country}/${p.org}/${p.form}`;
+    const first = forms.get(key);
+    if (!first) forms.set(key, p);
+    else if (first.formTitle !== p.formTitle || first.portal !== p.portal)
+      throw new Error(`form ${key} has mixed formTitle or portal`);
   }
   return out;
 }

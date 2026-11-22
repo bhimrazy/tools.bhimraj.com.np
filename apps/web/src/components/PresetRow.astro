@@ -1,25 +1,27 @@
 ---
-import type { Preset } from "@tools/presets";
+import { uploadPath, type Preset } from "@tools/presets";
 import ChevronRight from "lucide-react/icons/chevron-right";
 import { Silhouette } from "./brand/Silhouette";
-import { ruleChecked, ruleLine } from "../lib/presets";
+import { formatChecked, formatSizeRule } from "../lib/format";
 
 interface Props {
   preset: Preset;
 }
 const { preset } = Astro.props;
-const { width, height } = preset.output;
+const { width, height } = preset.rule;
 ---
 
 <a
-  href={`/${preset.path}`}
+  href={uploadPath(preset)}
   class="grid min-h-[60px] grid-cols-[40px_minmax(0,1fr)_16px] items-center gap-x-3 border-b border-line py-2.5 text-ink no-underline hover:bg-card"
 >
   <Silhouette width={width ?? 1} height={height ?? width ?? 1} />
   <span class="grid min-w-0">
     <span class="text-[15px] leading-snug font-semibold">{preset.title}</span>
     <span class="num text-[13px] text-muted-foreground">
-      <span translate="no">{ruleLine(preset)}</span>{" · "}<span class:list={[preset.verifiedAt && "text-ink"]}>{ruleChecked(preset)}</span>
+      <span translate="no">{formatSizeRule(preset.rule)}</span>{" · "}<span class:list={[preset.verifiedAt && "text-ink"]}
+        >{formatChecked(preset)}</span
+      >
     </span>
   </span>
   <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={2} />

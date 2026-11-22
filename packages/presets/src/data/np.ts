@@ -1,5 +1,5 @@
 import type { Preset } from "../index";
-import { kbMax, kbMin } from "../schema";
+import { kbToMaxBytes, kbToMinBytes } from "../bytes";
 
 // Figures come from an applicant-guide site, not an official PSC notice; official pages gave no sizes.
 const source = {
@@ -9,6 +9,9 @@ const source = {
 const common = {
   country: "NP",
   portal: "Lok Sewa Aayog (psconline.psc.gov.np)",
+  org: "psc",
+  form: "lok-sewa-application",
+  formTitle: "Lok Sewa Aayog online application",
   source,
   verifiedAt: null,
 } as const;
@@ -16,16 +19,17 @@ const common = {
 export const np: Preset[] = [
   {
     ...common,
-    id: "np-lok-sewa-photo",
-    path: "np/lok-sewa-photo",
+    id: "np-psc-lok-sewa-application-photo",
+    upload: "photo",
     title: "Lok Sewa Aayog online application photo",
     kind: "photo",
-    output: {
+    rule: {
       format: "image/jpeg",
+      fit: "cover",
       width: 300,
       height: 350,
-      minBytes: kbMin(10),
-      maxBytes: kbMax(200),
+      minBytes: kbToMinBytes(10),
+      maxBytes: kbToMaxBytes(200),
       background: "#ffffff",
     },
     notes:
@@ -33,16 +37,17 @@ export const np: Preset[] = [
   },
   {
     ...common,
-    id: "np-lok-sewa-signature",
-    path: "np/lok-sewa-signature",
+    id: "np-psc-lok-sewa-application-signature",
+    upload: "signature",
     title: "Lok Sewa Aayog online application signature",
     kind: "signature",
-    output: {
+    rule: {
       format: "image/jpeg",
+      fit: "contain",
       width: 300,
       height: 80,
-      minBytes: kbMin(5),
-      maxBytes: kbMax(100),
+      minBytes: kbToMinBytes(5),
+      maxBytes: kbToMaxBytes(100),
       background: "#ffffff",
     },
     notes:

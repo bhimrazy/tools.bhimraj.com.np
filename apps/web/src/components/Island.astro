@@ -1,21 +1,23 @@
 ---
-// Server-renders a React island with a fixed useId prefix, so `hydrateIslands` (src/lib/hydrate.ts)
+// Server-renders a React island with a fixed useId prefix, so hydrateIsland (src/lib/hydrate.ts)
 // can hydrate it with the same prefix. Astro's `client:*` directives would inline a script and a
 // style element, which the CSP (`script-src 'self'; style-src 'self'`) blocks; see docs/adr/0005.
 import type { ComponentType } from "react";
 import { renderToString } from "react-dom/server";
-import { islandPrefix, islandTree } from "../lib/island";
+import { getIslandPrefix, toIslandTree } from "../lib/island";
 
 interface Props {
   name: string;
   component: ComponentType<never>;
+  /** Plain data only: serialised to JSON for hydration. An `id` key makes the useId prefix unique. */
   props?: Record<string, unknown>;
 }
 
 const { name, component, props = {} } = Astro.props;
-const html = renderToString(islandTree(component as ComponentType<typeof props>, props), {
-  identifierPrefix: islandPrefix(name),
+const prefix = getIslandPrefix(name, typeof props["id"] === "string" ? props["id"] : undefined);
+const html = renderToString(toIslandTree(component as ComponentType<typeof props>, props), {
+  identifierPrefix: prefix,
 });
 ---
 
-<div data-island={name} data-props={JSON.stringify(props)} set:html={html} />
+<div data-island={name} data-island-prefix={prefix} data-props={JSON.stringify(props)} set:html={html} />

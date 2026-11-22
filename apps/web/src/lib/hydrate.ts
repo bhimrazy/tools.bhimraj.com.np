@@ -1,18 +1,14 @@
 import type { ComponentType } from "react";
 import { hydrateRoot } from "react-dom/client";
-import { islandPrefix, islandTree } from "./island";
+import { toIslandTree } from "./island";
 
-/** Hydrates every `<Island name={name}>` on the page with its serialised props. */
-export function hydrateIslands<P extends object>(
-  name: string,
+/** Hydrates one `<Island>` element with its serialised props and the server's useId prefix. */
+export function hydrateIsland<P extends object>(
+  el: HTMLElement,
   Component: ComponentType<P>,
 ) {
-  for (const el of document.querySelectorAll<HTMLElement>(
-    `[data-island="${name}"]`,
-  )) {
-    const props = JSON.parse(el.dataset["props"] ?? "{}") as P;
-    hydrateRoot(el, islandTree(Component, props), {
-      identifierPrefix: islandPrefix(name),
-    });
-  }
+  const props = JSON.parse(el.dataset["props"] ?? "{}") as P;
+  hydrateRoot(el, toIslandTree(Component, props), {
+    identifierPrefix: el.dataset["islandPrefix"] ?? "",
+  });
 }

@@ -2,7 +2,7 @@
 // Devanagari and Bengali faces: the browser fetches a file only when its script appears (unicode-range).
 import "@fontsource-variable/noto-sans-devanagari/wght.css";
 import "@fontsource-variable/noto-sans-bengali/wght.css";
-import { presets } from "@tools/presets";
+import { groupByCountry } from "@tools/presets";
 import FileCheck from "lucide-react/icons/file-check";
 import ImageUp from "lucide-react/icons/image-up";
 import Shrink from "lucide-react/icons/shrink";
@@ -11,13 +11,13 @@ import PresetRow from "../components/PresetRow.astro";
 import { cn } from "cn";
 import { buttonVariants } from "../components/ui/button";
 import Base from "../layouts/Base.astro";
-import { countryName, groupByCountry, nativeCountry } from "../lib/presets";
+import { countryName, getNativeCountry, sortByCountryName } from "../lib/format";
 
-const groups = groupByCountry(presets);
+const groups = sortByCountryName(groupByCountry());
 ---
 
 <Base
-  title="Tools by Bhimraj: photos and signatures at the exact size your form asks for"
+  title="Tools: form-ready photos and image compression, on your device"
   description="Resize and compress photos and signatures to exam and visa form size rules, or to any size in KB. Your files stay on your device."
   path="/"
 >
@@ -48,7 +48,7 @@ const groups = groupByCountry(presets);
       </div>
       {
         groups.map(([country, list]) => {
-          const native = nativeCountry(country);
+          const native = getNativeCountry(country);
           return (
             <section aria-labelledby={`c-${country}`} class="mt-5 first-of-type:mt-0">
               <div class="flex items-baseline gap-2.5 pb-1.5">

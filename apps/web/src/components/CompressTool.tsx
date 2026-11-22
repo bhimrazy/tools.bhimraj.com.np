@@ -1,9 +1,17 @@
-import type {
-  CompressOptions,
-  CompressResult,
-  ImageEngine,
-  OutputFormat,
-} from "@tools/engines/image";
+import {
+  type CompressResult,
+  ImageError,
+  type ImageWorker,
+  type OutputFormat,
+} from "@tools/image";
+import {
+  KB,
+  kbToMaxBytes,
+  maxBytesToKb,
+  minBytesToKb,
+  type SizeRule,
+  type UploadKind,
+} from "@tools/presets";
 import Check from "lucide-react/icons/check";
 import ChevronRight from "lucide-react/icons/chevron-right";
 import Download from "lucide-react/icons/download";
@@ -23,32 +31,19 @@ import {
 import { cn } from "cn";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { gaugeState } from "../lib/gauge";
-import {
-  figureKb,
-  formatBytes,
-  formatKb,
-  KB_MAX,
-  statedMaxKb,
-  statedMinKb,
-} from "../lib/units";
-import { FitGauge } from "./brand/FitGauge";
+import { getGaugeState } from "../lib/gauge";
+import { markIslandReady, takePendingFile } from "../lib/pending-file";
+import { formatBytes, formatFigureKb, formatFileSize } from "../lib/units";
+import { FitsGauge } from "./brand/FitsGauge";
 import { StatusGlyph } from "./brand/StatusGlyph";
 
-export interface ToolSpec {
-  format: OutputFormat;
-  maxBytes: number;
-  minBytes?: number;
-  width?: number;
-  height?: number;
-  background?: string;
-}
-
 export interface CompressToolProps {
-  /** Fixed size rule (preset pages). Omitted: the generic tool with an editable limit. */
-  spec?: ToolSpec;
-  kind?: "photo" | "signature" | "scan";
-  /** Preset pages: false when the rule has not been checked against an official source. */
+  /** Fixed size rule (form pages). Omitted: the generic tool with an editable limit. */
+  rule?: SizeRule;
+  kind?: UploadKind;
+  /** Prefix for element ids, unique per page when a form page holds several tools. */
+  id?: string;
+  /** Form pages: false when the rule has not been checked against an official source. */
   verified?: boolean;
 }
 
@@ -62,9 +57,13 @@ interface Original {
 
 type Result = CompressResult & { url: string; filename: string };
 type Phase = "empty" | "working" | "done" | "error";
+interface Failure {
+  title: string;
+  message: string;
+}
 
-const INPUT_ID = "compress-file";
-const DEFAULT_KB = 50;
+const DEFAULT_ID = "compress";
+const DEFAULT_MAX_KB = 100;
 const CHIPS_KB = [20, 50, 100, 200, 1000];
 // Loaded after first paint: both pull in Base UI's positioning code, and Select server-renders a style="".
 const FormatSelect = lazy(() => import("./FormatSelect"));
@@ -78,6 +77,42 @@ const isHeic = (f: File) =>
   /hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
 const HEIC_MSG =
   "HEIC photos can't be opened yet. On iPhone, choose Settings › Camera › Formats › Most Compatible, or take a screenshot of the photo and add that.";
+
+/** Plain words for each way a job can fail (`ImageError.code`). */
+function toFailure(err: unknown, file: File): Failure {
+  const code = err instanceof ImageError ? err.code : "internal";
+  switch (code) {
+    case "decode_failed":
+      return {
+        title: "Can't open this file",
+        message: isHeic(file)
+          ? HEIC_MSG
+          : `Can't open ${file.name}. Choose a JPG, PNG or WebP image.`,
+      };
+    case "too_many_pixels":
+      return {
+        title: "Too large to open on this device",
+        message:
+          "Choose a smaller copy of the image, or open this page on a computer.",
+      };
+    case "timeout":
+      return {
+        title: "This took too long",
+        message:
+          "It was stopped so the page stays usable. Try a smaller image.",
+      };
+    case "unsupported_browser":
+      return {
+        title: "This browser can't make images",
+        message: "Update your browser, or open this page in another one.",
+      };
+    default:
+      return {
+        title: "Something went wrong",
+        message: "Try again, or choose another image.",
+      };
+  }
+}
 
 function stem(name: string): string {
   const base = name
@@ -102,15 +137,17 @@ const positive = (v: string) => {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
 };
 
-function genericSpec(
+function toCustomRule(
   kb: string,
   w: string,
   h: string,
   format: OutputFormat,
-): ToolSpec {
-  const out: ToolSpec = {
+): SizeRule {
+  const out: SizeRule = {
     format,
-    maxBytes: Math.round((Number(kb) > 0 ? Number(kb) : DEFAULT_KB) * KB_MAX),
+    fit: "cover",
+    // Same headroom as presets, so the stated limit reads back as typed.
+    maxBytes: kbToMaxBytes(Number(kb) > 0 ? Number(kb) : DEFAULT_MAX_KB),
   };
   const width = positive(w);
   const height = positive(h);
@@ -131,11 +168,14 @@ const useHydrated = () =>
   );
 
 export function CompressTool({
-  spec,
+  rule,
   kind = "photo",
+  id = DEFAULT_ID,
   verified,
 }: CompressToolProps) {
-  const [kb, setKb] = useState(String(DEFAULT_KB));
+  const inputId = `${id}-file`;
+  const resultId = `${id}-result-heading`;
+  const [kb, setKb] = useState(String(DEFAULT_MAX_KB));
   const [w, setW] = useState("");
   const [h, setH] = useState("");
   const [format, setFormat] = useState<OutputFormat>("image/jpeg");
@@ -143,22 +183,25 @@ export function CompressTool({
   const [original, setOriginal] = useState<Original | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [phase, setPhase] = useState<Phase>("empty");
-  const [error, setError] = useState("");
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [dragging, setDragging] = useState(false);
   const hydrated = useHydrated();
 
-  const engine = useRef<ImageEngine | null>(null);
+  const worker = useRef<ImageWorker | null>(null);
   const job = useRef<AbortController | null>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const kbInput = useRef<HTMLInputElement>(null);
+  const root = useRef<HTMLDivElement>(null);
 
-  const target: ToolSpec = spec ?? genericSpec(kb, w, h, format);
-  const noun = spec ? kind : "image";
+  const target: SizeRule = rule ?? toCustomRule(kb, w, h, format);
+  const noun = rule ? kind : "image";
   const aNoun = noun === "image" ? "an image" : `a ${noun}`;
-  const lo = spec?.minBytes;
+  const lo = rule?.minBytes;
+  const maxKb = maxBytesToKb(target.maxBytes);
   const limitText = lo
-    ? `${statedMinKb(lo)}–${statedMaxKb(target.maxBytes)} KB`
-    : `under ${statedMaxKb(target.maxBytes)} KB`;
+    ? `${minBytesToKb(lo)}–${maxKb} KB`
+    : `under ${maxKb} KB`;
   const ruleWords = `Your limit is ${limitText}.`;
 
   useEffect(() => {
@@ -176,13 +219,29 @@ export function CompressTool({
   useEffect(
     () => () => {
       job.current?.abort();
-      engine.current?.dispose();
+      worker.current?.dispose();
     },
     [],
   );
 
+  // Mounted: take over from the page's loader (src/lib/load-island.ts). Keep anything typed
+  // or picked before this code arrived.
+  useEffect(() => {
+    const island = root.current?.closest("[data-island]");
+    markIslandReady(island);
+    const typed = kbInput.current?.value;
+    if (typed && typed !== kb) setKb(typed);
+    const waiting = takePendingFile(island);
+    if (waiting) void run(waiting);
+  }, []);
+
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
+      // With several tools on a page, the paste goes to the one holding focus.
+      const tools = document.querySelectorAll(
+        '[data-island="compress"]',
+      ).length;
+      if (tools > 1 && !root.current?.contains(document.activeElement)) return;
       const pasted = [...(e.clipboardData?.files ?? [])].find((f) =>
         f.type.startsWith("image/"),
       );
@@ -195,40 +254,37 @@ export function CompressTool({
     return () => document.removeEventListener("paste", onPaste);
   });
 
-  async function run(next: File, opts: ToolSpec = target) {
+  async function run(next: File, opts: SizeRule = target) {
     job.current?.abort();
     const ctrl = new AbortController();
     job.current = ctrl;
     setFile(next);
     setResult(null);
-    setError("");
+    setFailure(null);
     setPhase("working");
 
     try {
       if (!original || file !== next) {
         const url = URL.createObjectURL(next);
-        const dims = await readDimensions(url).catch(() => {
+        const dims = await readDimensions(url).catch((cause: unknown) => {
           URL.revokeObjectURL(url);
-          throw new Error(
-            isHeic(next)
-              ? HEIC_MSG
-              : `Can't open ${next.name}. Choose a JPG, PNG or WebP image.`,
-          );
+          throw new ImageError("decode_failed", `Can't decode ${next.name}`, {
+            cause,
+          });
         });
         if (ctrl.signal.aborted) return URL.revokeObjectURL(url);
         setOriginal({ name: next.name, bytes: next.size, url, ...dims });
       }
 
-      if (!engine.current) {
-        const { createImageEngine } = await import("@tools/engines/image");
-        engine.current = createImageEngine();
+      if (!worker.current) {
+        const { createImageWorker } = await import("@tools/image");
+        worker.current = createImageWorker();
       }
-      const options: CompressOptions = { ...opts, fit: "cover" };
-      const out = await engine.current.compress(next, options, ctrl.signal);
+      const out = await worker.current.compress(next, opts, ctrl.signal);
       if (ctrl.signal.aborted) return;
 
       const ext = out.format === "image/webp" ? "webp" : "jpg";
-      const filename = `${stem(next.name)}-${out.width}x${out.height}-${Math.round(out.bytes / KB_MAX)}kb.${ext}`;
+      const filename = `${stem(next.name)}-${out.width}x${out.height}-${Math.round(out.bytes / KB)}kb.${ext}`;
       setResult({ ...out, url: URL.createObjectURL(out.blob), filename });
       setPhase("done");
       requestAnimationFrame(() => resultHeading.current?.focus());
@@ -238,12 +294,7 @@ export function CompressTool({
         (err instanceof DOMException && err.name === "AbortError")
       )
         return;
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(
-        isHeic(next) && !msg.startsWith("HEIC")
-          ? HEIC_MSG
-          : msg || "Something went wrong. Try again.",
-      );
+      setFailure(toFailure(err, next));
       setOriginal(null);
       setPhase("error");
     }
@@ -290,13 +341,13 @@ export function CompressTool({
       : "";
     setW(String(nw));
     setH(nh);
-    void run(file, genericSpec(kb, String(nw), nh, format));
+    void run(file, toCustomRule(kb, String(nw), nh, format));
   };
 
   const fileInputEl = (
     <input
       ref={fileInput}
-      id={INPUT_ID}
+      id={inputId}
       name="file"
       className="peer sr-only"
       type="file"
@@ -309,7 +360,7 @@ export function CompressTool({
     variant: "default" | "outline" = "default",
   ) => (
     <label
-      htmlFor={INPUT_ID}
+      htmlFor={inputId}
       className={cn(
         buttonVariants({ variant }),
         "cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
@@ -327,31 +378,31 @@ export function CompressTool({
     </span>
   );
 
-  const pass = result ? result.withinTarget : false;
+  const pass = result ? result.fitsBytes : false;
   const state = result
-    ? gaugeState(result.bytes, target.maxBytes, lo)
+    ? getGaugeState(result.bytes, target.maxBytes, lo)
     : "empty";
-  const fig = result ? figureKb(result.bytes, pass) : "";
+  const fig = result ? formatFigureKb(result.bytes, pass) : "";
 
   return (
-    <div className="grid gap-4 md:gap-5">
+    <div className="grid gap-4 md:gap-5" ref={root}>
       {/* The task, said as one sentence. */}
       <div className="rounded-xl border border-line bg-card p-3.5 md:px-5 md:py-[18px]">
-        {spec ? (
+        {rule ? (
           <p className="text-lg leading-snug font-medium text-ink-2 md:text-2xl">
             Make your {kind}{" "}
-            {spec.width && spec.height && (
+            {rule.width && rule.height && (
               <b className="num font-[650] text-ink" translate="no">
-                {spec.width} × {spec.height} px
+                {rule.width} × {rule.height} px
               </b>
             )}
-            {spec.width && spec.height ? ", " : ""}
+            {rule.width && rule.height ? ", " : ""}
             <b className="num font-[650] text-ink" translate="no">
               {limitText}
             </b>
             , as{" "}
-            <b className="font-[650] text-ink">{FORMAT_NAME[spec.format]}</b>
-            {spec.background && /^#f{3}(f{3})?$/i.test(spec.background) ? (
+            <b className="font-[650] text-ink">{FORMAT_NAME[rule.format]}</b>
+            {rule.background && /^#f{3}(f{3})?$/i.test(rule.background) ? (
               <> on a white background</>
             ) : null}
             .
@@ -368,6 +419,7 @@ export function CompressTool({
                 <span className="sr-only">Size limit (KB)</span>
                 <Input
                   className="h-10 w-[5.5rem] rounded-sm bg-paper px-2 text-center text-[17px] font-[650] md:h-11 md:text-xl"
+                  ref={kbInput}
                   name="kb"
                   type="number"
                   inputMode="decimal"
@@ -473,17 +525,17 @@ export function CompressTool({
               </span>
               <span className="num font-semibold">Your limit: {limitText}</span>
             </div>
-            <FitGauge
+            <FitsGauge
               lo={lo}
               hi={target.maxBytes}
               state="empty"
               label={`No ${noun} yet. ${ruleWords}`}
-              loText={lo ? `${statedMinKb(lo)} KB` : undefined}
-              hiText={`${statedMaxKb(target.maxBytes)} KB limit`}
+              loText={lo ? `${minBytesToKb(lo)} KB` : undefined}
+              hiText={`${maxKb} KB limit`}
             />
           </div>
 
-          {phase === "error" && (
+          {phase === "error" && failure && (
             <div
               role="alert"
               className="flex gap-3 rounded-xl border border-line bg-card p-4"
@@ -493,8 +545,8 @@ export function CompressTool({
                 className="mt-0.5 size-6 shrink-0 text-status-bad"
               />
               <div className="grid gap-1">
-                <h2 className="t-h3">Can't open this file</h2>
-                <p className="text-[15px] text-ink-2">{error}</p>
+                <h2 className="t-h3">{failure.title}</h2>
+                <p className="text-[15px] text-ink-2">{failure.message}</p>
               </div>
             </div>
           )}
@@ -524,10 +576,10 @@ export function CompressTool({
             {chooseLabel(
               phase === "error" ? `Choose another ${noun}` : `Choose ${aNoun}`,
             )}
-            <p className="flex items-start justify-center gap-1.5 text-[13px] text-balance text-muted-foreground">
+            <p className="text-center text-[13px] text-balance text-muted-foreground">
               <Smartphone
                 aria-hidden="true"
-                className="size-4 text-accent-ink"
+                className="mr-1.5 inline size-4 align-[-3px] text-accent-ink"
                 strokeWidth={2}
               />
               Your {noun} stays on this device. Nothing is uploaded.
@@ -551,7 +603,7 @@ export function CompressTool({
               />
               <span className="num absolute top-2.5 left-2.5 rounded-xs bg-image-scrim px-2 py-1 text-xs font-semibold text-on-image">
                 {!result
-                  ? `Original · ${formatKb(original.bytes)}`
+                  ? `Original · ${formatFileSize(original.bytes)}`
                   : pass
                     ? `After · ${fig} KB`
                     : `Best try · ${fig} KB`}
@@ -576,10 +628,13 @@ export function CompressTool({
               </b>
               <span>
                 {result
-                  ? `${result.width} × ${result.height} px · ${fig} KB · was ${formatKb(original.bytes)}`
-                  : `${original.width} × ${original.height} px · ${formatKb(original.bytes)}`}
+                  ? `${result.width} × ${result.height} px · ${fig} KB · was ${formatFileSize(original.bytes)}`
+                  : `${original.width} × ${original.height} px · ${formatFileSize(original.bytes)}`}
               </span>
             </p>
+            <div className="justify-self-start">
+              {chooseLabel(`Choose another ${noun}`, "outline")}
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-xl border border-line bg-card">
@@ -591,16 +646,16 @@ export function CompressTool({
                     Making it smaller…
                   </p>
                   <p className="num">
-                    <b>Now {formatKb(original.bytes)}.</b> {ruleWords}
+                    <b>Now {formatFileSize(original.bytes)}.</b> {ruleWords}
                   </p>
-                  <FitGauge
+                  <FitsGauge
                     lo={lo}
                     hi={target.maxBytes}
                     at={original.bytes}
                     state="pending"
-                    label={`Now ${formatKb(original.bytes)}. ${ruleWords}`}
-                    loText={lo ? `${statedMinKb(lo)} KB` : undefined}
-                    hiText={`${statedMaxKb(target.maxBytes)} KB limit`}
+                    label={`Now ${formatFileSize(original.bytes)}. ${ruleWords}`}
+                    loText={lo ? `${minBytesToKb(lo)} KB` : undefined}
+                    hiText={`${maxKb} KB limit`}
                   />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2.5 p-4">
@@ -625,19 +680,20 @@ export function CompressTool({
                   className={`grid gap-2.5 px-[18px] pt-[18px] pb-3.5 ${pass ? "on-band" : "bg-status-bad-soft text-ink"}`}
                 >
                   <h2
+                    id={resultId}
                     ref={resultHeading}
                     tabIndex={-1}
                     className="flex items-start gap-2 text-[15px] leading-snug font-[650]"
                   >
                     <StatusGlyph
-                      status={pass ? "fit" : "no"}
+                      status={pass ? "fits" : "no"}
                       className={`size-5 shrink-0 ${pass ? "" : "text-status-bad"}`}
                     />
                     {pass
-                      ? `Done: ${fig} KB, ${lo ? `inside your ${limitText} limit` : `under your ${statedMaxKb(target.maxBytes)} KB limit`}`
+                      ? `Done: ${fig} KB, ${lo ? `inside your ${limitText} limit` : `under your ${maxKb} KB limit`}`
                       : state === "under"
-                        ? `Too small: ${fig} KB. The smallest allowed is ${statedMinKb(lo ?? 0)} KB.`
-                        : `Too big: ${fig} KB. Your limit is ${statedMaxKb(target.maxBytes)} KB.`}
+                        ? `Too small: ${fig} KB. The smallest allowed is ${minBytesToKb(lo ?? 0)} KB.`
+                        : `Too big: ${fig} KB. Your limit is ${maxKb} KB.`}
                   </h2>
                   <Suspense
                     fallback={
@@ -649,14 +705,14 @@ export function CompressTool({
                   >
                     <ExactSize fig={fig} bytes={formatBytes(result.bytes)} />
                   </Suspense>
-                  <FitGauge
+                  <FitsGauge
                     lo={lo}
                     hi={target.maxBytes}
                     at={result.bytes}
-                    state={pass ? "fit" : state}
+                    state={pass ? "fits" : state}
                     label={`${fig} KB. ${ruleWords}`}
-                    loText={lo ? `${statedMinKb(lo)} KB` : undefined}
-                    hiText={`${statedMaxKb(target.maxBytes)} KB limit`}
+                    loText={lo ? `${minBytesToKb(lo)} KB` : undefined}
+                    hiText={`${maxKb} KB limit`}
                   />
                   <p
                     className={`text-xs ${pass ? "text-on-band-muted" : "text-ink-2"}`}
@@ -711,12 +767,14 @@ export function CompressTool({
                       </p>
                     )}
                     <div className="px-4 pt-3.5">
-                      <Button
-                        className="h-14 w-full justify-start"
-                        nativeButton={false}
-                        render={
-                          <a href={result.url} download={result.filename} />
-                        }
+                      {/* A real link: Base UI's Button would give it role="button". */}
+                      <a
+                        className={cn(
+                          buttonVariants(),
+                          "h-14 w-full justify-start",
+                        )}
+                        href={result.url}
+                        download={result.filename}
                       >
                         <Download aria-hidden="true" />
                         <span className="grid text-left leading-tight">
@@ -728,7 +786,7 @@ export function CompressTool({
                             {result.filename}
                           </small>
                         </span>
-                      </Button>
+                      </a>
                     </div>
                     <div className="px-4 pt-3 pb-3.5">
                       <p className="mb-0.5 text-xs font-semibold text-muted-foreground">
@@ -758,11 +816,11 @@ export function CompressTool({
                       <div className="grid gap-2 rounded-lg border border-line bg-paper p-3.5">
                         <p className="text-[15px]">
                           <b>Fix:</b>{" "}
-                          {spec
+                          {rule
                             ? `crop your ${kind} closer, or save it smaller, then add it again.`
                             : "make it fewer pixels wide, then try again."}
                         </p>
-                        {!spec && (
+                        {!rule && (
                           <Button className="w-full" onClick={smaller}>
                             Make it {Math.max(1, Math.round(result.width / 2))}{" "}
                             px wide and try again

@@ -379,7 +379,7 @@
     background: var(--color-band);
     color: var(--color-on-band);
     box-shadow: inset 0 0 0 1px var(--color-band-edge);
-    --fit-dot: var(--color-signal-on-band);
+    --fits-dot: var(--color-signal-on-band);
     --mk-dot: var(--color-signal-on-band);
   }
 
@@ -390,10 +390,10 @@
     gap: 6px;
     font-size: 0.8125rem;
     font-weight: 600;
-    --fit-dot: var(--color-signal);
+    --fits-dot: var(--color-signal);
   }
   .on-band .st {
-    --fit-dot: var(--color-signal-on-band);
+    --fits-dot: var(--color-signal-on-band);
   }
   .st > svg {
     width: 18px;
@@ -438,8 +438,8 @@
   .mk-dot {
     fill: var(--mk-dot, var(--color-signal));
   }
-  .fit-dot {
-    fill: var(--fit-dot, var(--color-signal));
+  .fits-dot {
+    fill: var(--fits-dot, var(--color-signal));
   }
   .unv-fill {
     fill: var(--color-status-warn-icon);
@@ -478,7 +478,7 @@
     stroke: var(--color-rail);
     stroke-width: 3;
   }
-  .gauge[data-state="fit"] .g-mark {
+  .gauge[data-state="fits"] .g-mark {
     fill: var(--color-signal-bright);
   }
   .gauge[data-state="over"] .g-mark,

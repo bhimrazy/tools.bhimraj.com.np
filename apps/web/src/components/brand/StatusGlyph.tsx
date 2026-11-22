@@ -1,10 +1,10 @@
 import type { SVGProps } from "react";
 
-export type Status = "fit" | "work" | "no" | "err" | "unv" | "idle";
+export type Status = "fits" | "work" | "no" | "err" | "unv" | "idle";
 
 /**
  * Status glyphs built from the mark's ring (24-unit grid). Decorative: always pair one with a word.
- * fit = the mark; work = faint ring, arc and dot (never spins); no = ring opens, dot outside;
+ * fits = the mark; work = faint ring, arc and dot (never spins); no = ring opens, dot outside;
  * err = ring with a mark; unv = dashed ring, amber fill; idle = empty ring.
  */
 export function StatusGlyph({
@@ -23,10 +23,16 @@ export function StatusGlyph({
       focusable="false"
       {...props}
     >
-      {status === "fit" && (
+      {status === "fits" && (
         <>
           <circle cx="12" cy="12" r="8.75" strokeWidth="2.25" />
-          <circle className="fit-dot" cx="15.4" cy="12" r="2.6" stroke="none" />
+          <circle
+            className="fits-dot"
+            cx="15.4"
+            cy="12"
+            r="2.6"
+            stroke="none"
+          />
         </>
       )}
       {status === "work" && (

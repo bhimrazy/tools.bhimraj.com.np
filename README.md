@@ -9,16 +9,17 @@ Live at [tools.bhimraj.com.np](https://tools.bhimraj.com.np).
 
 ```
 apps/
-  web/          Astro static site with React islands: one page per tool and per form preset
+  web/          Astro static site with React islands: one page per tool and per form (/forms/{cc}/{org}/{form})
 packages/
-  engines/      in-browser processing, one worker per engine family (image, later pdf, ai)
-  presets/      sourced registry of form specs: pixels, KB limits, format, background
-  seo/          SITE_ORIGIN and URL helpers; the only place the host is configured
+  image/        in-browser image processing in a worker (later siblings: pdf, carbon)
+  presets/      sourced registry of form size rules: pixels, KB limits, format, background
+  site/         SITE_ORIGIN, URL and repo-link helpers; the only place the host is configured
   tsconfig/     shared compiler settings
+bench/          image benchmark harness (Vite page driven by Playwright)
 docs/adr/       architecture decisions
 ```
 
-Planned channels reuse `packages/engines`: `apps/extension`, `apps/android` (TWA) and `apps/widget`.
+Planned channels reuse `packages/image`: `apps/extension`, `apps/android` (TWA) and `apps/widget`.
 
 ## Develop
 
@@ -31,6 +32,15 @@ bun run verify         # format check, host check, typecheck, tests, build
 ```
 
 Bun's built-ins do the toolchain work: `bun fmt`, `bun check`, `bun test`, `bun run --filter`.
+
+## Testing
+
+```sh
+bun run build && bun run e2e   # Playwright against the built site (wrangler on :4402)
+bun run bench                  # on-device image benchmark, 4x CPU throttle; not run in CI
+```
+
+First run needs `bunx playwright install chromium`. Set `BROWSER_PATH` to use an existing Chromium.
 
 ## License
 

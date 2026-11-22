@@ -6,11 +6,11 @@ The repository is public for viewing only: all rights reserved, no licence to us
 copy, modify or distribute (`LICENSE`). Packages set `"license": "SEE LICENSE IN LICENSE"`
 and `"private": true`.
 
-Considered: AGPL (as midday and dub use) and open core (dub's `/ee`). Both allow
+Considered: AGPL, and open core (AGPL plus a commercially licensed directory). Both allow
 copying, forks and competing deployments, which this project doesn't want. PolyForm
 Strict allows non-commercial use.
 
 GitHub's terms still let anyone view and fork a public repository on GitHub; the
-licence controls everything beyond that. Revisit at v2 if an open engine package
-becomes the proof behind the privacy claim; the per-directory licence pattern dub uses
-would allow that without opening the rest.
+licence controls everything beyond that. Revisit at v2 if an open capability package (such as `@tools/image`)
+becomes the proof behind the privacy claim; a per-directory licence would allow that
+without opening the rest.

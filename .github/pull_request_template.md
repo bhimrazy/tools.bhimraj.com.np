@@ -18,7 +18,7 @@
 <details>
 <summary>Details</summary>
 
-<!-- Rationale, trade-offs, edge cases, follow-ups. Anything that touches the network, the CSP or a preset spec: say so here. -->
+<!-- Rationale, trade-offs, edge cases, follow-ups. Anything that touches the network, the CSP or a preset's size rule: say so here. -->
 
 </details>
 
