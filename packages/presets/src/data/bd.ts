@@ -7,6 +7,7 @@ const common = {
   org: "teletalk",
   form: "job-application",
   formTitle: "Teletalk job application",
+  formLocalName: { lang: "bn", text: "টেলিটক" },
   source: null,
   verifiedAt: null,
 } as const;

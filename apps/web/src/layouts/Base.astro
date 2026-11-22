@@ -1,6 +1,11 @@
 ---
+import { formPath, groupByForm } from "@tools/presets";
 import { absoluteUrl, NEW_ISSUE_URL, REPO_URL } from "@tools/site";
+import Monitor from "lucide-react/icons/monitor";
+import Moon from "lucide-react/icons/moon";
+import Search from "lucide-react/icons/search";
 import Smartphone from "lucide-react/icons/smartphone";
+import Sun from "lucide-react/icons/sun";
 import { Lockup } from "../components/brand/Mark";
 import "../styles/global.css";
 
@@ -12,9 +17,18 @@ interface Props {
   noindex?: boolean;
   /** Which main nav item this page belongs to. */
   section?: "forms" | "image";
+  /** Home holds the search itself, so the header's link to it is left out there. */
+  search?: boolean;
 }
 
-const { title, description, path, noindex = false, section } = Astro.props;
+const { title, description, path, noindex = false, section, search = true } = Astro.props;
+const forms = [...groupByForm().values()].map((uploads) => uploads[0]!);
+const themes = [
+  { value: "system", label: "System", Icon: Monitor },
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+] as const;
+const footLink = "block py-3 text-ink-2 no-underline hover:text-ink hover:underline md:py-[3px]";
 const canonical = absoluteUrl(path);
 const fullTitle = path === "/" ? title : `${title} · Tools by Bhimraj`;
 const nav = [
@@ -34,6 +48,7 @@ const nav = [
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
+    <script is:inline src="/theme.js"></script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -53,8 +68,8 @@ const nav = [
     </a>
     <header class="border-b border-line bg-card">
       <div class="mx-auto flex min-h-[60px] w-full max-w-[1120px] items-center gap-3 px-4 md:min-h-[68px] md:gap-5 md:px-8">
-        <Lockup href="/" className="text-xl md:text-[21px]" />
-        <nav aria-label="Main" class="ml-auto flex gap-0.5 md:ml-0 md:mr-auto">
+        <Lockup href="/" className="min-h-11 text-xl md:text-[21px]" />
+        <nav aria-label="Main" class="ml-auto flex gap-0.5 md:ml-0">
           {
             nav.map((n) => (
               <a
@@ -67,7 +82,19 @@ const nav = [
             ))
           }
         </nav>
-        <p class="hidden items-center gap-1.5 text-[13px] font-[550] text-ink-2 md:inline-flex">
+        <span class="hidden flex-1 md:block"></span>
+        {
+          search && (
+            <a
+              href="/#search"
+              class="inline-flex size-11 items-center justify-center rounded-lg border border-input bg-card text-ink no-underline hover:border-ink md:h-10 md:w-64 md:justify-start md:gap-2 md:px-3 md:text-sm md:text-muted-foreground"
+            >
+              <Search aria-hidden="true" className="size-[18px] md:size-4" strokeWidth={2} />
+              <span class="sr-only md:not-sr-only">Search forms and tools</span>
+            </a>
+          )
+        }
+        <p class="hidden items-center gap-1.5 text-[13px] font-[550] text-ink-2 lg:inline-flex">
           <Smartphone aria-hidden="true" className="size-4 text-accent-ink" strokeWidth={2} />
           0 files uploaded
           <span class="sr-only">. Your files stay on this device.</span>
@@ -79,36 +106,66 @@ const nav = [
         <slot />
       </div>
     </main>
-    <footer class="border-t border-line bg-card">
-      <div class="mx-auto grid w-full max-w-[1120px] grid-cols-2 gap-x-4 gap-y-5 px-4 py-6 text-sm md:grid-cols-5 md:px-8">
-        <div>
+    <footer class="mt-auto border-t border-line bg-card">
+      <div class="mx-auto grid w-full max-w-[1120px] grid-cols-2 gap-x-4 gap-y-5 px-4 py-7 text-sm md:grid-cols-4 md:px-8">
+        <div class="col-span-2 md:col-span-1">
           <h2 class="mb-1.5 text-[13px] font-[650]">Forms</h2>
-          <a href="/#forms" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">All forms</a>
+          {
+            forms.map((f) => (
+              <a href={formPath(f)} class={footLink}>
+                {f.formTitle}
+              </a>
+            ))
+          }
+          <a href="/#forms" class={footLink}>All forms</a>
         </div>
         <div>
           <h2 class="mb-1.5 text-[13px] font-[650]">Image</h2>
-          <a href="/compress-image" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">Compress to KB</a>
+          <a href="/compress-image" class={footLink}>Compress to KB</a>
+          <a href="/compress-image#custom" class={footLink}>Enter your own size rule</a>
         </div>
         <div>
           <h2 class="mb-1.5 text-[13px] font-[650]">About</h2>
-          <a href={NEW_ISSUE_URL} rel="noopener noreferrer external" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">
-            Report a different size rule
-          </a>
-          <a href={REPO_URL} rel="noopener noreferrer external" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">
-            Source code
-          </a>
+          <a href={NEW_ISSUE_URL} rel="noopener noreferrer external" class={footLink}>Report a different size rule</a>
+          <a href={REPO_URL} rel="noopener noreferrer external" class={footLink}>Source code</a>
         </div>
       </div>
-      <div class="on-band border-t border-band-edge">
+      <div class="on-band">
         <div class="mx-auto flex w-full max-w-[1120px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-5 md:px-8">
           <Lockup className="text-[22px]" />
           <p class="max-w-[52ch] text-sm">
             Photos and signatures at the exact size your form asks for. Free, and your files stay on your device.
           </p>
-          <p class="inline-flex items-center gap-1.5 text-[13px] font-semibold md:ml-auto">
-            <Smartphone aria-hidden="true" className="size-4" strokeWidth={2} />
-            0 files uploaded
-          </p>
+          <div class="flex w-full flex-wrap items-center justify-between gap-3 md:ml-auto md:w-auto md:gap-5">
+            <p class="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+              <Smartphone aria-hidden="true" className="size-4" strokeWidth={2} />
+              0 files uploaded
+            </p>
+            <div
+              role="radiogroup"
+              aria-label="Theme"
+              data-theme-switch
+              hidden
+              class="inline-flex gap-0.5 rounded-full p-0.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-on-band)_30%,transparent)]"
+            >
+              {
+                themes.map(({ value, label, Icon }) => (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked="false"
+                    aria-label={label}
+                    title={label}
+                    data-value={value}
+                    tabindex="-1"
+                    class="grid size-11 cursor-pointer place-items-center rounded-full text-on-band-muted transition-colors hover:text-on-band aria-checked:bg-on-band aria-checked:text-band md:size-9"
+                  >
+                    <Icon aria-hidden="true" className="size-4" strokeWidth={2} />
+                  </button>
+                ))
+              }
+            </div>
+          </div>
         </div>
       </div>
     </footer>

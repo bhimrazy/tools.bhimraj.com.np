@@ -28,11 +28,15 @@ A **tool page** is any page that accepts a file, including every preset page.
 - The tool is the first thing on the page; explanation comes after.
 - Works at 360px with no horizontal scroll, in light and dark.
 - A 12 MP photo finishes in under 3 s in Chrome with 4× CPU throttling; `packages/image` PRs state the measured time.
-- Pages without a tool ship no JavaScript; a tool page ships at most 50 KB gzip before a file is chosen.
+- Pages without a tool ship no JavaScript except `/theme.js` (about 1 KB gzip, applies the saved theme
+  before paint); a tool page, home included, ships at most 50 KB gzip before a file is chosen.
 - Keyboard reachable, visible focus, WCAG AA contrast, 44px tap targets.
 - Errors say what happened and what to do next; nothing fails silently.
 - Copy is plain English a non-native reader follows.
 - Professional and restrained, per `apps/web/DESIGN.md`: no illustrations, emoji, gradients or decorative motion.
+  The one fit motion is functional and is off under `prefers-reduced-motion`.
+- Countries are listed in the owner's order (`COUNTRY_ORDER`: Nepal, United States, Bangladesh), never
+  alphabetically.
 
 ## Search
 

@@ -1,3 +1,4 @@
+import { cn } from "cn";
 import {
   Tooltip,
   TooltipContent,
@@ -9,16 +10,18 @@ import {
 export default function ExactSize({
   fig,
   bytes,
+  className,
 }: {
   fig: string;
   bytes: string;
+  className?: string | undefined;
 }) {
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger
           render={<span tabIndex={0} />}
-          className="figure w-fit rounded-xs"
+          className={cn("figure w-fit rounded-xs", className)}
           aria-label={`${fig} KB, exactly ${bytes}`}
         >
           <b>{fig}</b>

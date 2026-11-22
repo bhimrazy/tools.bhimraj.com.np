@@ -43,6 +43,9 @@ export const presetSchema = z
       })
       .nullable(),
     verifiedAt: isoDate.nullable(),
+    formLocalName: z
+      .strictObject({ lang: z.enum(["ne", "bn"]), text: z.string().min(1) })
+      .optional(),
     notes: z.string().optional(),
   })
   .strict()
@@ -80,8 +83,12 @@ export function validatePresets(list: readonly unknown[]): Preset[] {
     const key = `${p.country}/${p.org}/${p.form}`;
     const first = forms.get(key);
     if (!first) forms.set(key, p);
-    else if (first.formTitle !== p.formTitle || first.portal !== p.portal)
-      throw new Error(`form ${key} has mixed formTitle or portal`);
+    else if (
+      first.formTitle !== p.formTitle ||
+      first.portal !== p.portal ||
+      first.formLocalName?.text !== p.formLocalName?.text
+    )
+      throw new Error(`form ${key} has mixed formTitle, portal or local name`);
   }
   return out;
 }

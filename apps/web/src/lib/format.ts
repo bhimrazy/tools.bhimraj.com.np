@@ -27,10 +27,6 @@ export function formatDimensions({ width, height }: SizeRule): string | null {
   return null;
 }
 
-/** Country groups sorted by display name. */
-export const sortByCountryName = (groups: Map<string, Preset[]>) =>
-  [...groups].sort(([a], [b]) => countryName(a).localeCompare(countryName(b)));
-
 export const formatDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
     day: "numeric",

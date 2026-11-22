@@ -1,11 +1,9 @@
 ---
-import { CompressTool, type CompressToolProps } from "./CompressTool";
+import { CompressTool } from "./CompressTool";
 import Island from "./Island.astro";
-
-type Props = CompressToolProps;
 ---
 
-<Island name="compress" component={CompressTool} props={{ ...Astro.props }} />
+<Island name="compress" component={CompressTool} />
 
 <script>
   import "../islands/compress-tool";

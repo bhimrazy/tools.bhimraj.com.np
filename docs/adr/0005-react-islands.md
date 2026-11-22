@@ -50,6 +50,10 @@ closes; on a slow connection the tool may need a moment to respond to its first 
 Only the components a page uses are installed (button, input, select, tooltip); others are added
 with `bunx shadcn add` when a feature needs them.
 
+Since the v4 layout (home launcher, form kits) every page also loads `/theme.js` (about 1 KiB gz),
+and home is a tool page: on load it ships the launcher's loader and the recent-forms script (about
+2.5 KiB gz with `theme.js` and the shared preload helper); React loads on first use, as above.
+
 ## Revisit
 
 If a 2–3 GB Android phone misses the ~3 s target for a 12 MP photo because of main-thread

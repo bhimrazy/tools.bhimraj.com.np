@@ -2,47 +2,154 @@
 // Devanagari and Bengali faces: the browser fetches a file only when its script appears (unicode-range).
 import "@fontsource-variable/noto-sans-devanagari/wght.css";
 import "@fontsource-variable/noto-sans-bengali/wght.css";
-import { groupByCountry } from "@tools/presets";
+import {
+  formPath,
+  groupByCountry,
+  groupByForm,
+  maxBytesToKb,
+  minBytesToKb,
+  presets,
+  uploadPath,
+} from "@tools/presets";
+import ChevronRight from "lucide-react/icons/chevron-right";
 import FileCheck from "lucide-react/icons/file-check";
-import ImageUp from "lucide-react/icons/image-up";
+import FileText from "lucide-react/icons/file-text";
+import Ruler from "lucide-react/icons/ruler";
 import Shrink from "lucide-react/icons/shrink";
 import Smartphone from "lucide-react/icons/smartphone";
-import PresetRow from "../components/PresetRow.astro";
+import UserX from "lucide-react/icons/user-x";
 import { cn } from "cn";
+import type { DropRoute } from "../components/Launcher";
+import LauncherIsland from "../components/LauncherIsland.astro";
+import PresetRow from "../components/PresetRow.astro";
 import { buttonVariants } from "../components/ui/button";
 import Base from "../layouts/Base.astro";
-import { countryName, getNativeCountry, sortByCountryName } from "../lib/format";
+import { countryName, formatDate, formatSizeRule, getNativeCountry } from "../lib/format";
+import type { SearchEntry } from "../lib/search";
 
-const groups = sortByCountryName(groupByCountry());
+const groups = [...groupByCountry()];
+const scriptOf = (lang: string) => (lang === "bn" ? "beng" : "deva") as "deva" | "beng";
+const checkedText = (verifiedAt: string | null) => (verifiedAt ? `Checked ${formatDate(verifiedAt)}` : "Not checked");
+
+// Search reads real presets only: names in English and in the form's own script, country, kind.
+const entries: SearchEntry[] = [
+  ...presets.map((p) => {
+    const native = getNativeCountry(p.country);
+    const { rule } = p;
+    return {
+      type: "form" as const,
+      title: p.title,
+      href: uploadPath(p),
+      detail: `${formatSizeRule(rule)} · ${countryName(p.country)} · ${checkedText(p.verifiedAt)}`,
+      ...(p.formLocalName && {
+        local: { ...p.formLocalName, script: scriptOf(p.formLocalName.lang) },
+      }),
+      terms: [
+        p.title,
+        p.formTitle,
+        p.portal,
+        p.form.replaceAll("-", " "),
+        p.kind,
+        countryName(p.country),
+        native?.name,
+        p.formLocalName?.text,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .normalize("NFC"),
+      ...(rule.width && { width: rule.width }),
+      ...(rule.height && { height: rule.height }),
+      ...(rule.minBytes && { minKb: minBytesToKb(rule.minBytes) }),
+      maxKb: maxBytesToKb(rule.maxBytes),
+    };
+  }),
+  {
+    type: "tool",
+    title: "Compress to KB",
+    href: "/compress-image",
+    detail: "Any size in KB, in your browser",
+    terms: "compress image photo picture size kb mb reduce smaller jpg jpeg webp",
+  },
+];
+
+const routes: DropRoute[] = presets.map((p) => {
+  const { rule } = p;
+  const maxKb = maxBytesToKb(rule.maxBytes);
+  const minKb = rule.minBytes ? minBytesToKb(rule.minBytes) : undefined;
+  return {
+    title: p.title,
+    href: uploadPath(p),
+    detail: `${formatSizeRule(rule)} · ${checkedText(p.verifiedAt)}`,
+    kind: p.kind,
+    ...(rule.width && { width: rule.width }),
+    ...(rule.height && { height: rule.height }),
+    ...(rule.minBytes && { minBytes: rule.minBytes }),
+    maxBytes: rule.maxBytes,
+    ...(minKb && { minKb }),
+    maxKb,
+    limitText: minKb ? `${minKb}–${maxKb} KB` : `under ${maxKb} KB`,
+  };
+});
+
+const lokSewa = presets.find((p) => p.org === "psc");
+const teletalk = presets.find((p) => p.org === "teletalk");
+const tries = [
+  lokSewa && {
+    label: "Lok Sewa",
+    query: "lok sewa",
+    ...(lokSewa.formLocalName && {
+      local: { ...lokSewa.formLocalName, text: "लोक सेवा", script: "deva" as const },
+    }),
+  },
+  teletalk && {
+    label: "Teletalk",
+    query: "teletalk",
+    ...(teletalk.formLocalName && {
+      local: { ...teletalk.formLocalName, script: "beng" as const },
+    }),
+  },
+  { label: "DV Lottery photo", query: "dv lottery" },
+  { label: "Under 100 KB", query: "under 100 kb" },
+  { label: "300 × 300 px, 100 KB", query: "300x300 px 100kb" },
+].filter((t) => t !== undefined);
 ---
 
 <Base
   title="Tools: form-ready photos and image compression, on your device"
   description="Resize and compress photos and signatures to exam and visa form size rules, or to any size in KB. Your files stay on your device."
   path="/"
+  search={false}
 >
-  <div class="grid gap-5 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] md:items-start md:gap-8 md:pt-4">
-    <div>
-      <h1 class="t-hero">Make your photo or signature the right size for any form.</h1>
-      <p class="mt-2 max-w-[52ch] text-[15px] text-ink-2 md:text-[17px]">
-        Free. Works in your browser. Your files never leave your phone or computer.
-      </p>
-    </div>
-    <aside class="on-band grid justify-items-start gap-3 rounded-xl p-5 md:mt-1.5 md:p-6" aria-labelledby="drop-h">
-      <ImageUp aria-hidden="true" className="size-6" strokeWidth={1.75} />
-      <h2 id="drop-h" class="t-h3">Compress an image to a size in KB</h2>
-      <p class="text-sm text-on-band-muted">Set the limit, add your image, and download a file under it.</p>
-      <a href="/compress-image" class={cn(buttonVariants({ variant: "inverse" }))}>Compress an image</a>
-      <p class="flex items-center gap-1.5 text-[13px] text-on-band-muted">
-        <Smartphone aria-hidden="true" className="size-4 text-on-band" strokeWidth={2} />
-        Your file stays on this device.
-      </p>
-    </aside>
+  <div class="md:pt-4">
+    <LauncherIsland entries={entries} routes={routes} tries={tries} />
   </div>
 
-  <div class="mt-10 grid gap-y-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:gap-x-10">
-    <section id="forms" aria-labelledby="forms-h">
-      <div class="mb-3 flex items-baseline justify-between gap-3">
+  <section id="recent" aria-labelledby="recent-h" class="mt-12" hidden>
+    <div class="flex items-baseline justify-between gap-3">
+      <h2 id="recent-h" class="t-h2">Your recent forms</h2>
+      <button type="button" class={cn(buttonVariants({ variant: "link" }), "min-h-11 cursor-pointer")}>Clear list</button>
+    </div>
+    <p class="text-[13px] text-muted-foreground">Form names and dates only, saved on this device. No files.</p>
+    <ul class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"></ul>
+    <template id="recent-item">
+      <li>
+        <a
+          class="grid min-h-16 grid-cols-[24px_minmax(0,1fr)] items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5 text-ink no-underline transition-colors hover:border-line-strong"
+        >
+          <FileText aria-hidden="true" className="size-5 text-ink-2" strokeWidth={1.75} />
+          <span class="grid min-w-0">
+            <b data-title class="truncate text-sm font-semibold"></b>
+            <small data-when class="text-[13px] text-muted-foreground"></small>
+          </span>
+        </a>
+      </li>
+    </template>
+  </section>
+
+  <div class="mt-12 grid gap-y-10 md:mt-14 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] lg:gap-x-12">
+    <section id="forms" aria-labelledby="forms-h" class="scroll-mt-20">
+      <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 id="forms-h" class="t-h2">Forms</h2>
         <p class="text-[13px] text-muted-foreground">Each one shows where its size rule came from.</p>
       </div>
@@ -50,9 +157,9 @@ const groups = sortByCountryName(groupByCountry());
         groups.map(([country, list]) => {
           const native = getNativeCountry(country);
           return (
-            <section aria-labelledby={`c-${country}`} class="mt-5 first-of-type:mt-0">
-              <div class="flex items-baseline gap-2.5 pb-1.5">
-                <h3 id={`c-${country}`} class="text-lg font-[680] tracking-[-0.01em]">
+            <section aria-labelledby={`c-${country}`} class="mt-7 first-of-type:mt-0">
+              <div class="flex items-baseline gap-2.5 pb-2">
+                <h3 id={`c-${country}`} class="text-lg font-[680] tracking-[-0.015em]">
                   {countryName(country)}
                 </h3>
                 {native && (
@@ -61,13 +168,33 @@ const groups = sortByCountryName(groupByCountry());
                   </span>
                 )}
                 <span class="num ml-auto text-[13px] text-muted-foreground">
-                  {list.length} {list.length === 1 ? "form" : "forms"}
+                  {list.length} {list.length === 1 ? "upload" : "uploads"}
                 </span>
               </div>
-              <div class="border-t border-line">
-                {list.map((preset) => (
-                  <PresetRow preset={preset} />
-                ))}
+              <div class="border-t border-line-strong/60">
+                {[...groupByForm(list).values()].map((uploads) => {
+                  const f = uploads[0]!;
+                  const local = f.formLocalName;
+                  return (
+                    <div class="border-b border-line last:border-b-0">
+                      <a
+                        href={formPath(f)}
+                        class="group flex min-h-11 flex-wrap items-baseline gap-x-2 pt-3 pb-1 text-ink no-underline"
+                      >
+                        <b class="text-base font-[650] tracking-[-0.01em] group-hover:underline">{f.formTitle}</b>
+                        {local && (
+                          <span lang={local.lang} class:list={["text-sm text-muted-foreground", scriptOf(local.lang)]}>
+                            {local.text}
+                          </span>
+                        )}
+                        <span class="text-[13px] text-muted-foreground">{f.portal.match(/\((.*)\)$/)?.[1]}</span>
+                      </a>
+                      {uploads.map((preset) => (
+                        <PresetRow preset={preset} />
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             </section>
           );
@@ -75,34 +202,63 @@ const groups = sortByCountryName(groupByCountry());
       }
     </section>
 
-    <section aria-labelledby="tools-h">
-      <h2 id="tools-h" class="t-h2 mb-3">All tools</h2>
-      <h3 class="t-h3 border-b border-line pb-2">Image tools</h3>
-      <ul>
-        <li>
-          <a
-            href="/compress-image"
-            class="flex min-h-11 items-center gap-2.5 border-b border-line py-2 text-[15px] text-ink no-underline"
-          >
-            <Shrink aria-hidden="true" className="size-5 text-ink-2" strokeWidth={1.75} />
-            Compress to KB
-          </a>
-        </li>
-      </ul>
-    </section>
+    <aside class="grid content-start gap-6" aria-label="Tools">
+      <section aria-labelledby="tools-h">
+        <h2 id="tools-h" class="t-h2 mb-4">All tools</h2>
+        <h3 class="border-b border-line-strong/60 pb-2 text-lg font-[680] tracking-[-0.015em]">Image tools</h3>
+        <ul>
+          <li>
+            <a
+              href="/compress-image"
+              class="group grid min-h-16 grid-cols-[24px_minmax(0,1fr)_16px] items-center gap-3 border-b border-line px-1 py-2.5 text-ink no-underline transition-colors hover:bg-card"
+            >
+              <Shrink aria-hidden="true" className="size-5 text-ink-2" strokeWidth={1.75} />
+              <span class="grid">
+                <b class="text-[15px] font-semibold">Compress to KB</b>
+                <span class="text-[13px] text-muted-foreground">20, 50, 100 KB or any size you need</span>
+              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                strokeWidth={2}
+              />
+            </a>
+          </li>
+          <li>
+            <a
+              href="/compress-image#custom"
+              class="group grid min-h-16 grid-cols-[24px_minmax(0,1fr)_16px] items-center gap-3 border-b border-line px-1 py-2.5 text-ink no-underline transition-colors hover:bg-card"
+            >
+              <Ruler aria-hidden="true" className="size-5 text-ink-2" strokeWidth={1.75} />
+              <span class="grid">
+                <b class="text-[15px] font-semibold">Exact width and height</b>
+                <span class="text-[13px] text-muted-foreground">Crop to the pixels your notice asks for</span>
+              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                strokeWidth={2}
+              />
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <section class="grid gap-3 rounded-xl border border-line bg-card p-5" aria-labelledby="custom-h">
+        <div>
+          <h2 id="custom-h" class="t-h3">Can't find your form?</h2>
+          <p class="mt-1 text-sm text-ink-2">Enter the size rule from your notice: the size in KB, and the width and height if it gives them.</p>
+        </div>
+        <a href="/compress-image#custom" class={cn(buttonVariants({ variant: "outline" }), "justify-self-start")}>
+          Enter your own size rule
+        </a>
+      </section>
+    </aside>
   </div>
 
-  <section class="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-card p-4 md:p-5">
-    <div>
-      <h2 class="t-h3">Can't find your form?</h2>
-      <p class="mt-1 text-[13px] text-muted-foreground">Enter the size rule from your notice.</p>
-    </div>
-    <a href="/compress-image" class={cn(buttonVariants({ variant: "outline" }))}>Enter your own size rule</a>
-  </section>
-
-  <section aria-labelledby="priv-h" class="mt-10 md:border-t md:border-line md:pt-6">
+  <section aria-labelledby="priv-h" class="mt-14 border-t border-line pt-8">
     <h2 id="priv-h" class="t-h2">How we keep your files private</h2>
-    <ul class="my-4 grid gap-4 md:grid-cols-3 md:gap-6">
+    <ul class="mt-5 grid gap-5 md:grid-cols-3 md:gap-8">
       <li class="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-3 text-[15px] text-ink-2">
         <Smartphone aria-hidden="true" className="size-6 text-accent-ink" strokeWidth={1.75} />
         <p>Your files never leave this device. Every tool runs in your browser.</p>
@@ -110,6 +266,10 @@ const groups = sortByCountryName(groupByCountry());
       <li class="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-3 text-[15px] text-ink-2">
         <FileCheck aria-hidden="true" className="size-6 text-accent-ink" strokeWidth={1.75} />
         <p>Each form shows where its size rule came from, and when we checked it.</p>
+      </li>
+      <li class="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-3 text-[15px] text-ink-2">
+        <UserX aria-hidden="true" className="size-6 text-accent-ink" strokeWidth={1.75} />
+        <p>No account and no sign-in. Nothing to fill in before you start.</p>
       </li>
     </ul>
   </section>

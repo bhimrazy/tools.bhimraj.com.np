@@ -12,6 +12,8 @@ export interface FitsGaugeProps {
   label: string;
   loText?: string | undefined;
   hiText: string;
+  /** Where the marker comes from (bytes), for the one fit motion. Omit under reduced motion. */
+  from?: number | undefined;
 }
 
 /**
@@ -26,8 +28,11 @@ export function FitsGauge({
   label,
   loText,
   hiText,
+  from,
 }: FitsGaugeProps) {
   const g = computeGaugeScale({ lo, hi, at });
+  const start =
+    from === undefined ? undefined : computeGaugeScale({ hi, at: from }).at;
   const pct = (n: number) => `${n}%`;
   return (
     <svg
@@ -59,6 +64,19 @@ export function FitsGauge({
       )}
       {g.at !== undefined && (
         <svg x={pct(g.at)} y="19" overflow="visible">
+          {start !== undefined && start !== g.at && (
+            // SMIL rather than CSS: the position is an attribute, and nothing inline is needed.
+            <animate
+              attributeName="x"
+              from={pct(start)}
+              to={pct(g.at)}
+              dur="420ms"
+              calcMode="spline"
+              keyTimes="0;1"
+              keySplines="0.16 0.84 0.24 1"
+              fill="freeze"
+            />
+          )}
           {state === "fits" || state === "pending" ? (
             <circle className="g-mark" r="9" />
           ) : (

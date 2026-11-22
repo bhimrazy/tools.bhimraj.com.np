@@ -20,6 +20,13 @@ Everything visual comes from **one block** at the top of `src/styles/global.css`
 Dark mode follows `prefers-color-scheme`; `<html data-theme="dark|light">` overrides it. The
 `dark:` variant follows the same rule, but components rarely need it: the tokens change instead.
 
+**Theme switch.** The footer band holds a System / Light / Dark radiogroup (lucide `monitor`, `sun`,
+`moon`; arrow keys move the choice; 44px targets on phones). `public/theme.js` is loaded blocking in
+`<head>` (an external file, since the CSP allows no inline script): it reads `localStorage.theme`,
+sets or removes `data-theme` before first paint, keeps both `theme-color` metas in step, follows
+`prefers-color-scheme` while System is chosen, then wires the control. "System" removes the key. The
+control is `hidden` in the HTML and shown by the script, so without JavaScript the OS theme applies.
+
 **To recolour:** point layer-2 tokens at other raw steps in both the light and the dark block, then
 check every text pair still reaches 4.5:1 and every border, glyph and gauge part 3:1.
 
@@ -54,7 +61,8 @@ Devanagari and Bengali runs use **Noto Sans Devanagari** and **Noto Sans Bengali
 them (home and form pages); the browser fetches a script's file only when that script appears.
 Set `lang` on every such run.
 
-Styles: `.t-hero` (home headline only), `.t-h1`, `.t-h2`, `.t-h3`; body 16px; captions 13px.
+Styles: `.t-hero` (home headline only; 28 / 46 / 56px at phone / 768 / 1024), `.t-h1` (21 / 36 / 40px),
+`.t-h2` (19 / 24px), `.t-h3`; body 16px; captions 13px. The task sentence on a tool is 19 / 26px.
 Figures use `.num` (tabular, lining). Inputs stay 16px or larger so phones don't zoom.
 
 ## Shape and space
@@ -75,7 +83,12 @@ only on things that float. Buttons are 48px (`sm` 44px on phone, 40px from 640px
   `style` attribute. The upper limit sits at two thirds; ticks above the marker; a file that fits
   is a sky circle, one that doesn't is a magenta diamond. Figures round down on a pass and up on a
   fail (`formatFigureKb`).
-- **Silhouette**: a form's upload shape at true proportion.
+- **Silhouette** (`Silhouette.tsx`): a form's upload shape at true proportion in a 40px box (rows,
+  search results, the dropped file). `SilhouetteFrame` is the large version in an empty kit slot, with
+  the pixel width above and height beside it.
+- **Fit motion**: when a result appears, the gauge marker moves from the original file's size to the
+  saved size (420ms, `--ease-settle`, an SVG `<animate>` so nothing inline is needed) and the result
+  band fades in. Under `prefers-reduced-motion` the animate element is not rendered and durations are 0.
 
 Favicon and app icons in `public/` are the system's Logos files (app tile, maskable tile).
 
@@ -88,6 +101,28 @@ magenta), `link`, `inverse` and `outline-band` (on the band). Icons are `lucide-
 per icon (`lucide-react/icons/download`), 20px at 1.75 stroke or 16px at 2.
 
 In `.astro` files, use `cn(buttonVariants(...))` so conflicting classes merge.
+
+## Page patterns
+
+- **One band per page.** The graphite band (`.on-band`) is the brand moment: the drop panel on home,
+  the result head when a file fits (tool page and kit slot header), and the footer.
+- **Home is a launcher.** Search first (`Launcher.tsx`): it reads sizes and limits ("300x350 50kb",
+  "under 100 kb"; small figures without a unit read as mm and never match a px rule) and matches
+  form names in English, Nepali and Bengali, over real presets only. The band takes a file and lists
+  where it can go; a wide image offers signature uploads first. The chosen page receives the file
+  through IndexedDB (`lib/handoff.ts`, deleted on arrival or after 5 minutes). Forms follow
+  `COUNTRY_ORDER` in `@tools/presets` (Nepal, United States, Bangladesh), grouped by form, one row per
+  upload. "Your recent forms" (names and dates only, in `localStorage`) is drawn by a few lines of
+  plain script, never React.
+- **Tool page: one work slot.** The task sentence, the limits-only gauge and the drop area sit in one
+  card; after a file it becomes preview plus result in the same card.
+- **Kit (form page).** One slot per upload, side by side from 768px: header with status glyph and
+  word (on the band when ready), the shape at true proportion, gauge, rule line, "Rule not checked
+  yet" when unchecked. One summary below: checklist, the not-checked note with "Report a different
+  rule", and "Download all" (a store-only .zip, `lib/zip.ts`) when the form has more than one upload.
+- **Phone action bar** (`ActionBar.tsx`): sticky to the bottom while its tool is on screen, one figure
+  and one verb ("98.7 KB · Download image", "1 of 2 ready · Add signature"). In-slot buttons that
+  repeat its verb are hidden below 768px.
 
 ## Copy
 
@@ -102,7 +137,8 @@ Check your notice before you submit." Sentence case, no exclamation marks, no em
 - CSP `style-src 'self'`: no `style=""` in server HTML and no `<style>` elements. Islands run inside
   Base UI's `CSPProvider` with `disableStyleElements`. Controls that server-render a style
   attribute (`Select`, `Slider`) render only after hydration.
-- Content pages ship no JavaScript. Tool islands load their code on first use and must work as
-  server HTML until then (see `docs/adr/0005-react-islands.md`).
+- Content pages ship no JavaScript except `/theme.js` (about 1 KB gzip). Tool islands load their
+  code on first use and must work as server HTML until then (see `docs/adr/0005-react-islands.md`);
+  a URL with a query (a size rule from search, a file from home) loads it at once.
 - 44px tap targets, visible focus, AA contrast, 360px width, light and dark.
 - `prefers-reduced-motion` sets all durations to 0.

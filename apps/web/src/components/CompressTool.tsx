@@ -1,29 +1,14 @@
-import {
-  type CompressResult,
-  ImageError,
-  type ImageWorker,
-  type OutputFormat,
-} from "@tools/image";
-import {
-  KB,
-  kbToMaxBytes,
-  maxBytesToKb,
-  minBytesToKb,
-  type SizeRule,
-  type UploadKind,
-} from "@tools/presets";
+import type { OutputFormat } from "@tools/image";
+import { kbToMaxBytes, maxBytesToKb, type SizeRule } from "@tools/presets";
 import Check from "lucide-react/icons/check";
 import ChevronRight from "lucide-react/icons/chevron-right";
 import Download from "lucide-react/icons/download";
 import ImageUp from "lucide-react/icons/image-up";
 import Smartphone from "lucide-react/icons/smartphone";
 import {
-  type ChangeEvent,
-  type DragEvent,
   lazy,
   type SubmitEvent,
   Suspense,
-  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -31,109 +16,29 @@ import {
 import { cn } from "cn";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getGaugeState } from "../lib/gauge";
-import { markIslandReady, takePendingFile } from "../lib/pending-file";
 import { formatBytes, formatFigureKb, formatFileSize } from "../lib/units";
+import { useCompressJob } from "../lib/use-compress-job";
 import { formatVerdict } from "../lib/verdict";
+import { ActionBar } from "./ActionBar";
 import { FitsGauge } from "./brand/FitsGauge";
 import { StatusGlyph } from "./brand/StatusGlyph";
+import { ResultBand } from "./ResultBand";
 
 export interface CompressToolProps {
-  /** Fixed size rule (form pages). Omitted: the generic tool with an editable limit. */
-  rule?: SizeRule;
-  kind?: UploadKind;
-  /** Prefix for element ids, unique per page when a form page holds several tools. */
+  /** Prefix for element ids. */
   id?: string;
-  /** Form pages: false when the rule has not been checked against an official source. */
-  verified?: boolean;
 }
 
-interface Original {
-  name: string;
-  bytes: number;
-  width: number;
-  height: number;
-  url: string;
-}
-
-type Result = CompressResult & { url: string; filename: string };
-type Phase = "empty" | "working" | "done" | "error";
-interface Failure {
-  title: string;
-  message: string;
-}
-
-const DEFAULT_ID = "compress";
 const DEFAULT_MAX_KB = 100;
 const CHIPS_KB = [20, 50, 100, 200, 1000];
-// Loaded after first paint: both pull in Base UI's positioning code, and Select server-renders a style="".
+// Loaded after first paint: it pulls in Base UI's positioning code, and Select server-renders a style="".
 const FormatSelect = lazy(() => import("./FormatSelect"));
-const ExactSize = lazy(() => import("./ExactSize"));
-const FORMAT_NAME: Record<OutputFormat, string> = {
+export const FORMAT_NAME: Record<OutputFormat, string> = {
   "image/jpeg": "JPG",
   "image/webp": "WebP",
 };
 
-const isHeic = (f: File) =>
-  /hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
-const HEIC_MSG =
-  "HEIC photos can't be opened yet. On iPhone, choose Settings › Camera › Formats › Most Compatible, or take a screenshot of the photo and add that.";
-
-/** Plain words for each way a job can fail (`ImageError.code`). */
-function toFailure(err: unknown, file: File): Failure {
-  const code = err instanceof ImageError ? err.code : "internal";
-  switch (code) {
-    case "decode_failed":
-      return {
-        title: "Can't open this file",
-        message: isHeic(file)
-          ? HEIC_MSG
-          : `Can't open ${file.name}. Choose a JPG, PNG or WebP image.`,
-      };
-    case "too_many_pixels":
-      return {
-        title: "Too large to open on this device",
-        message:
-          "Choose a smaller copy of the image, or open this page on a computer.",
-      };
-    case "timeout":
-      return {
-        title: "This took too long",
-        message:
-          "It was stopped so the page stays usable. Try a smaller image.",
-      };
-    case "unsupported_browser":
-      return {
-        title: "This browser can't make images",
-        message: "Update your browser, or open this page in another one.",
-      };
-    default:
-      return {
-        title: "Something went wrong",
-        message: "Try again, or choose another image.",
-      };
-  }
-}
-
-function stem(name: string): string {
-  const base = name
-    .replace(/\.[^.]+$/, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return base.slice(0, 40) || "image";
-}
-
-async function readDimensions(
-  url: string,
-): Promise<{ width: number; height: number }> {
-  const img = new Image();
-  img.src = url;
-  await img.decode();
-  return { width: img.naturalWidth, height: img.naturalHeight };
-}
-
-const positive = (v: string) => {
+const positive = (v: string | null | undefined) => {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
 };
@@ -168,206 +73,79 @@ const useHydrated = () =>
     () => false,
   );
 
-export function CompressTool({
-  rule,
-  kind = "photo",
-  id = DEFAULT_ID,
-  verified,
-}: CompressToolProps) {
+/** Compress to KB: the task as one sentence, and one work slot that changes state in place. */
+export function CompressTool({ id = "compress" }: CompressToolProps) {
   const inputId = `${id}-file`;
   const resultId = `${id}-result-heading`;
   const [kb, setKb] = useState(String(DEFAULT_MAX_KB));
   const [w, setW] = useState("");
   const [h, setH] = useState("");
+  const [customOpen, setCustomOpen] = useState(false);
   const [format, setFormat] = useState<OutputFormat>("image/jpeg");
-  const [file, setFile] = useState<File | null>(null);
-  const [original, setOriginal] = useState<Original | null>(null);
-  const [result, setResult] = useState<Result | null>(null);
-  const [phase, setPhase] = useState<Phase>("empty");
-  const [failure, setFailure] = useState<Failure | null>(null);
-  const [dragging, setDragging] = useState(false);
   const hydrated = useHydrated();
-
-  const worker = useRef<ImageWorker | null>(null);
-  const job = useRef<AbortController | null>(null);
-  const resultHeading = useRef<HTMLHeadingElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
   const kbInput = useRef<HTMLInputElement>(null);
   const wInput = useRef<HTMLInputElement>(null);
   const hInput = useRef<HTMLInputElement>(null);
-  const root = useRef<HTMLDivElement>(null);
 
-  const target: SizeRule = rule ?? toCustomRule(kb, w, h, format);
-  const noun = rule ? kind : "image";
-  const aNoun = noun === "image" ? "an image" : `a ${noun}`;
-  const lo = rule?.minBytes;
-  const maxKb = maxBytesToKb(target.maxBytes);
-  const limitText = lo
-    ? `${minBytesToKb(lo)}–${maxKb} KB`
-    : `under ${maxKb} KB`;
-  const ruleWords = `Your limit is ${limitText}.`;
-
-  useEffect(() => {
-    if (!result) return;
-    const { url } = result;
-    return () => URL.revokeObjectURL(url);
-  }, [result]);
-
-  useEffect(() => {
-    if (!original) return;
-    const { url } = original;
-    return () => URL.revokeObjectURL(url);
-  }, [original]);
-
-  useEffect(
-    () => () => {
-      job.current?.abort();
-      worker.current?.dispose();
-    },
-    [],
-  );
-
-  // Mounted: take over from the page's loader (src/lib/load-island.ts). Keep anything typed
-  // or picked before this code arrived.
-  useEffect(() => {
-    const island = root.current?.closest("[data-island]");
-    markIslandReady(island);
-    // Values typed into the server HTML before hydration live only in the DOM.
-    const typedKb = kbInput.current?.value || kb;
-    const typedW = wInput.current?.value ?? w;
-    const typedH = hInput.current?.value ?? h;
-    setKb(typedKb);
-    setW(typedW);
-    setH(typedH);
-    const waiting = takePendingFile(island);
-    if (waiting)
-      void run(waiting, rule ?? toCustomRule(typedKb, typedW, typedH, format));
-  }, []);
-
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      // With several tools on a page, the paste goes to the one holding focus.
-      const tools = document.querySelectorAll(
-        '[data-island="compress"]',
-      ).length;
-      if (tools > 1 && !root.current?.contains(document.activeElement)) return;
-      const pasted = [...(e.clipboardData?.files ?? [])].find((f) =>
-        f.type.startsWith("image/"),
+  const target = toCustomRule(kb, w, h, format);
+  const job = useCompressJob({
+    inputId,
+    target,
+    acceptsHandoff: () => true,
+    // Values typed into the server HTML before hydration live only in the DOM; a size rule
+    // from search arrives in the URL (?kb=50&w=300&h=350).
+    readMountTarget: () => {
+      const q = new URLSearchParams(location.search);
+      const typedKb = String(
+        positive(q.get("kb")) ?? (kbInput.current?.value || kb),
       );
-      if (pasted) {
-        e.preventDefault();
-        void run(pasted);
-      }
-    };
-    document.addEventListener("paste", onPaste);
-    return () => document.removeEventListener("paste", onPaste);
+      const typedW = q.get("w") ?? wInput.current?.value ?? w;
+      const typedH = q.get("h") ?? hInput.current?.value ?? h;
+      setKb(typedKb);
+      setW(positive(typedW) ? typedW : "");
+      setH(positive(typedH) ? typedH : "");
+      if (positive(typedW) || positive(typedH) || location.hash === "#custom")
+        setCustomOpen(true);
+      return toCustomRule(typedKb, typedW, typedH, format);
+    },
   });
+  const { phase, original, result, failure, file } = job;
 
-  async function run(next: File, opts: SizeRule = target) {
-    job.current?.abort();
-    const ctrl = new AbortController();
-    job.current = ctrl;
-    setFile(next);
-    setResult(null);
-    setFailure(null);
-    setPhase("working");
-
-    try {
-      if (!original || file !== next) {
-        const url = URL.createObjectURL(next);
-        const dims = await readDimensions(url).catch((cause: unknown) => {
-          URL.revokeObjectURL(url);
-          throw new ImageError("decode_failed", `Can't decode ${next.name}`, {
-            cause,
-          });
-        });
-        if (ctrl.signal.aborted) return URL.revokeObjectURL(url);
-        setOriginal({ name: next.name, bytes: next.size, url, ...dims });
-      }
-
-      if (!worker.current) {
-        const { createImageWorker } = await import("@tools/image");
-        worker.current = createImageWorker();
-      }
-      const out = await worker.current.compress(next, opts, ctrl.signal);
-      if (ctrl.signal.aborted) return;
-
-      const ext = out.format === "image/webp" ? "webp" : "jpg";
-      const filename = `${stem(next.name)}-${out.width}x${out.height}-${Math.round(out.bytes / KB)}kb.${ext}`;
-      setResult({ ...out, url: URL.createObjectURL(out.blob), filename });
-      setPhase("done");
-      requestAnimationFrame(() => resultHeading.current?.focus());
-    } catch (err) {
-      if (
-        ctrl.signal.aborted ||
-        (err instanceof DOMException && err.name === "AbortError")
-      )
-        return;
-      setFailure(toFailure(err, next));
-      setOriginal(null);
-      setPhase("error");
-    }
-  }
-
-  const cancel = () => {
-    job.current?.abort();
-    setOriginal(null);
-    setFile(null);
-    setPhase("empty");
-    requestAnimationFrame(() => fileInput.current?.focus());
-  };
-
-  const reset = () => {
-    setResult(null);
-    setOriginal(null);
-    setFile(null);
-    setPhase("empty");
-    requestAnimationFrame(() => fileInput.current?.focus());
-  };
-
-  const onInput = (e: ChangeEvent<HTMLInputElement>) => {
-    const picked = e.currentTarget.files?.[0];
-    e.currentTarget.value = "";
-    if (picked) void run(picked);
-  };
-
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragging(false);
-    const dropped = e.dataTransfer?.files[0];
-    if (dropped) void run(dropped);
-  };
+  const maxKb = maxBytesToKb(target.maxBytes);
+  const limitText = `under ${maxKb} KB`;
+  const ruleWords = `Your limit is ${limitText}.`;
+  const reading = phase === "working" && !original;
+  const pass = result?.fitsBytes ?? false;
+  const fig = result ? formatFigureKb(result.bytes, pass) : "";
+  const halfWidth = result ? Math.max(1, Math.round(result.width / 2)) : 0;
+  const announcement = reading
+    ? "Reading your image…"
+    : phase === "working"
+      ? "Making it smaller on this device…"
+      : result
+        ? formatVerdict(result.bytes, target)
+        : "";
 
   const onSettings = (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (file) void run(file);
+    if (file) void job.run(file);
   };
 
   const smaller = () => {
     if (!file || !result) return;
-    const nw = Math.max(1, Math.round(result.width / 2));
     const nh = positive(h)
       ? String(Math.max(1, Math.round(result.height / 2)))
       : "";
-    setW(String(nw));
+    setW(String(halfWidth));
     setH(nh);
-    void run(file, toCustomRule(kb, String(nw), nh, format));
+    setCustomOpen(true);
+    void job.run(file, toCustomRule(kb, String(halfWidth), nh, format));
   };
 
-  const fileInputEl = (
-    <input
-      ref={fileInput}
-      id={inputId}
-      name="file"
-      className="sr-only"
-      type="file"
-      accept="image/*"
-      onChange={onInput}
-    />
-  );
   const chooseLabel = (
     text: string,
     variant: "default" | "outline" = "default",
+    className = "",
   ) => (
     <label
       htmlFor={inputId}
@@ -375,126 +153,118 @@ export function CompressTool({
         buttonVariants({ variant }),
         // The input is visually hidden, so its keyboard focus is drawn on every label for it.
         "cursor-pointer group-has-[input[type=file]:focus-visible]/tool:outline-2 group-has-[input[type=file]:focus-visible]/tool:outline-offset-2 group-has-[input[type=file]:focus-visible]/tool:outline-ring",
+        className,
       )}
     >
       {text}
     </label>
   );
 
-  const formatClass =
-    "h-10 rounded-sm bg-paper text-[17px] font-[650] text-ink md:h-11 md:text-xl";
   const formatStatic = (
-    <span className="inline-flex h-10 items-center rounded-sm border border-input bg-paper px-3 text-[17px] font-[650] text-ink md:h-11 md:text-xl">
+    <span className="inline-flex h-11 items-center rounded-sm border border-input bg-paper px-3 text-[19px] font-[650] text-ink md:h-12 md:text-2xl">
       {FORMAT_NAME[format]}
     </span>
   );
 
-  const pass = result ? result.fitsBytes : false;
-  const state = result
-    ? getGaugeState(result.bytes, target.maxBytes, lo)
-    : "empty";
-  const reading = phase === "working" && !original;
-  const verdict = result ? formatVerdict(result.bytes, target) : "";
-  const announcement = reading
-    ? `Reading your ${noun}…`
-    : phase === "working"
-      ? `Making it smaller on this device…`
-      : phase === "done"
-        ? verdict
-        : "";
-  const fig = result ? formatFigureKb(result.bytes, pass) : "";
-
   return (
-    <div className="group/tool grid gap-4 md:gap-5" ref={root}>
-      {/* The task, said as one sentence. */}
-      <div className="rounded-xl border border-line bg-card p-3.5 md:px-5 md:py-[18px]">
-        {rule ? (
-          <p className="text-lg leading-snug font-medium text-ink-2 md:text-2xl">
-            Make your {kind}{" "}
-            {rule.width && rule.height && (
-              <b className="num font-[650] text-ink" translate="no">
-                {rule.width} × {rule.height} px
-              </b>
-            )}
-            {rule.width && rule.height ? ", " : ""}
-            <b className="num font-[650] text-ink" translate="no">
-              {limitText}
-            </b>
-            , as{" "}
-            <b className="font-[650] text-ink">{FORMAT_NAME[rule.format]}</b>
-            {rule.background && /^#f{3}(f{3})?$/i.test(rule.background) ? (
-              <> on a white background</>
-            ) : null}
-            .
-          </p>
-        ) : (
-          <form className="grid gap-3" onSubmit={onSettings}>
-            <p
-              className="flex flex-wrap items-center gap-2 text-lg leading-snug font-medium text-ink-2 md:gap-2.5 md:text-2xl"
-              role="group"
-              aria-label="Compress settings"
-            >
-              <span>Make your image smaller than</span>
-              <label className="inline-flex items-center">
-                <span className="sr-only">Size limit (KB)</span>
-                <Input
-                  className="h-10 w-[5.5rem] rounded-sm bg-paper px-2 text-center text-[17px] font-[650] md:h-11 md:text-xl"
-                  ref={kbInput}
-                  name="kb"
-                  type="number"
-                  inputMode="decimal"
-                  min={1}
-                  max={20000}
-                  step="any"
-                  required
-                  value={kb}
-                  onChange={(e) => setKb(e.currentTarget.value)}
+    <div className="group/tool" ref={job.root} data-tool-slot>
+      <input
+        ref={job.fileInput}
+        id={inputId}
+        name="file"
+        className="sr-only"
+        type="file"
+        accept="image/*"
+        onChange={job.onInput}
+      />
+      {/* One live region, always mounted, so each change is announced. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </p>
+
+      <div className="overflow-hidden rounded-xl border border-line bg-card">
+        {/* The task, said as one sentence. */}
+        <form
+          className="grid gap-3.5 p-4 md:px-6 md:py-5"
+          onSubmit={onSettings}
+        >
+          <p
+            className="flex flex-wrap items-center gap-x-2.5 gap-y-2 text-[19px] leading-snug font-medium text-ink-2 md:text-[26px]"
+            role="group"
+            aria-label="Compress settings"
+          >
+            <span>Make your image smaller than</span>
+            <label className="inline-flex items-center">
+              <span className="sr-only">Size limit (KB)</span>
+              <Input
+                className="num h-11 w-[5.5rem] rounded-sm bg-paper px-2 text-center text-[19px] font-[650] text-ink md:h-12 md:w-24 md:text-2xl"
+                ref={kbInput}
+                name="kb"
+                type="number"
+                inputMode="decimal"
+                min={1}
+                max={20000}
+                step="any"
+                required
+                value={kb}
+                onChange={(e) => setKb(e.currentTarget.value)}
+              />
+            </label>
+            <span translate="no">KB, as</span>
+            {hydrated ? (
+              <Suspense fallback={formatStatic}>
+                <FormatSelect
+                  value={format}
+                  onChange={setFormat}
+                  className="h-11 rounded-sm bg-paper text-[19px] font-[650] text-ink md:h-12 md:text-2xl"
                 />
-              </label>
-              <span translate="no">KB</span>
-              <span>as</span>
-              {hydrated ? (
-                <Suspense fallback={formatStatic}>
-                  <FormatSelect
-                    value={format}
-                    onChange={setFormat}
-                    className={formatClass}
-                  />
-                </Suspense>
-              ) : (
-                formatStatic
-              )}
-            </p>
-            <div
-              className="flex flex-wrap gap-1.5"
-              role="group"
-              aria-label="Common size limits"
-            >
-              {CHIPS_KB.map((c) => (
-                <Button
-                  key={c}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="num rounded-full px-3 font-[520]"
-                  aria-pressed={Number(kb) === c}
-                  onClick={() => setKb(String(c))}
-                >
-                  {kbLabel(c)}
-                </Button>
-              ))}
-            </div>
-            <fieldset className="flex flex-wrap items-end gap-3">
-              <legend className="mb-1.5 text-sm font-semibold">
-                Width and height{" "}
-                <span className="font-normal text-muted-foreground">
-                  (optional)
-                </span>
-              </legend>
+              </Suspense>
+            ) : (
+              formatStatic
+            )}
+          </p>
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Common size limits"
+          >
+            {CHIPS_KB.map((c) => (
+              <Button
+                key={c}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="num rounded-full px-3.5 font-[520]"
+                aria-pressed={Number(kb) === c}
+                onClick={() => setKb(String(c))}
+              >
+                {kbLabel(c)}
+              </Button>
+            ))}
+          </div>
+          <details
+            id="custom"
+            className="group/custom scroll-mt-20"
+            open={customOpen}
+            onToggle={(e) => setCustomOpen(e.currentTarget.open)}
+          >
+            <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 text-sm font-semibold text-ink">
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 transition-transform group-open/custom:rotate-90"
+                strokeWidth={2}
+              />
+              Width and height{" "}
+              <span className="font-normal text-muted-foreground">
+                (optional)
+              </span>
+            </summary>
+            <fieldset className="flex flex-wrap items-end gap-3 pt-1 pb-1">
+              <legend className="sr-only">Width and height</legend>
               <label className="grid gap-1 text-sm text-muted-foreground">
                 Width (px)
                 <Input
-                  className="w-28"
+                  className="num w-28"
                   ref={wInput}
                   name="width"
                   type="number"
@@ -509,7 +279,7 @@ export function CompressTool({
               <label className="grid gap-1 text-sm text-muted-foreground">
                 Height (px)
                 <Input
-                  className="w-28"
+                  className="num w-28"
                   ref={hInput}
                   name="height"
                   type="number"
@@ -521,360 +291,380 @@ export function CompressTool({
                   onChange={(e) => setH(e.currentTarget.value)}
                 />
               </label>
-              {file && (
-                <Button
-                  type="submit"
-                  variant="outline"
-                  disabled={phase === "working"}
-                >
-                  Try again with these settings
-                </Button>
-              )}
+              <p className="basis-full text-[13px] text-muted-foreground">
+                Set both to crop to that exact size from the centre.
+              </p>
             </fieldset>
-          </form>
-        )}
-      </div>
+          </details>
+          {file &&
+            job.ranWith &&
+            JSON.stringify(job.ranWith) !== JSON.stringify(target) && (
+              <Button
+                type="submit"
+                variant="outline"
+                className="justify-self-start"
+                disabled={phase === "working"}
+              >
+                Try again with these settings
+              </Button>
+            )}
+        </form>
 
-      {/* One live region, always mounted, so each change is announced. */}
-      <p className="sr-only" role="status" aria-live="polite">
-        {announcement}
-      </p>
+        {/* The work slot: limits first, then the file, then the result, all in this one place. */}
+        <div className="border-t border-line">
+          {(phase === "empty" || phase === "error" || reading) && (
+            <div className="grid gap-4 p-4 md:p-6">
+              <div>
+                <div className="flex flex-wrap justify-between gap-2 text-sm">
+                  {reading ? (
+                    <span className="st text-ink-2">
+                      <StatusGlyph status="work" />
+                      Reading your image…
+                    </span>
+                  ) : (
+                    <span className="st text-muted-foreground">
+                      <StatusGlyph status="idle" />
+                      No image yet
+                    </span>
+                  )}
+                  <span className="num font-semibold">
+                    Your limit: {limitText}
+                  </span>
+                </div>
+                <FitsGauge
+                  hi={target.maxBytes}
+                  state="empty"
+                  label={`No image yet. ${ruleWords}`}
+                  hiText={`${maxKb} KB limit`}
+                />
+              </div>
 
-      {/* The work slot. */}
-      {fileInputEl}
-      {(phase === "empty" || phase === "error" || reading) && (
-        <div className="grid gap-4">
-          <div className="rounded-xl border border-line bg-card px-4 pt-3.5 pb-1">
-            <div className="flex flex-wrap justify-between gap-2 text-sm">
-              {reading ? (
-                <span className="st text-ink-2">
-                  <StatusGlyph status="work" />
-                  Reading your {noun}…
-                </span>
-              ) : (
-                <span className="st text-muted-foreground">
-                  <StatusGlyph status="idle" />
-                  No {noun} yet
-                </span>
+              {phase === "error" && failure && (
+                <div
+                  role="alert"
+                  className="flex gap-3 rounded-lg bg-status-bad-soft p-4"
+                >
+                  <StatusGlyph
+                    status="err"
+                    className="mt-0.5 size-6 shrink-0 text-status-bad"
+                  />
+                  <div className="grid gap-1">
+                    <h2 className="t-h3">{failure.title}</h2>
+                    <p className="text-[15px] text-ink-2">{failure.message}</p>
+                  </div>
+                </div>
               )}
-              <span className="num font-semibold">Your limit: {limitText}</span>
-            </div>
-            <FitsGauge
-              lo={lo}
-              hi={target.maxBytes}
-              state="empty"
-              label={`No ${noun} yet. ${ruleWords}`}
-              loText={lo ? `${minBytesToKb(lo)} KB` : undefined}
-              hiText={`${maxKb} KB limit`}
-            />
-          </div>
 
-          {phase === "error" && failure && (
-            <div
-              role="alert"
-              className="flex gap-3 rounded-xl border border-line bg-card p-4"
-            >
-              <StatusGlyph
-                status="err"
-                className="mt-0.5 size-6 shrink-0 text-status-bad"
-              />
-              <div className="grid gap-1">
-                <h2 className="t-h3">{failure.title}</h2>
-                <p className="text-[15px] text-ink-2">{failure.message}</p>
+              <div
+                className={cn(
+                  "drop grid justify-items-center gap-2.5 rounded-lg border-[1.5px] border-dashed px-4 py-8 text-center transition-colors md:py-10",
+                  job.dragging
+                    ? "border-ink bg-sunk"
+                    : "border-line-strong bg-paper",
+                )}
+                {...job.dropHandlers}
+              >
+                <ImageUp
+                  aria-hidden="true"
+                  className="size-7 text-ink-2"
+                  strokeWidth={1.75}
+                />
+                <h2 className="t-h3">
+                  {job.dragging ? "Drop it to start" : "Add an image"}
+                </h2>
+                <p className="text-[13px] text-muted-foreground">
+                  JPG, PNG or WebP. Drop it here, paste it, or choose one.
+                </p>
+                {chooseLabel(
+                  phase === "error"
+                    ? "Choose another image"
+                    : "Choose an image",
+                  "default",
+                  "hidden md:inline-flex",
+                )}
+                <p className="text-center text-[13px] text-balance text-muted-foreground">
+                  <Smartphone
+                    aria-hidden="true"
+                    className="mr-1.5 inline size-4 align-[-3px] text-accent-ink"
+                    strokeWidth={2}
+                  />
+                  Your image stays on this device. Nothing is uploaded.
+                </p>
               </div>
             </div>
           )}
 
-          <div
-            className={`grid justify-items-center gap-2.5 rounded-xl border-[1.5px] border-dashed px-4 py-8 text-center transition-colors ${
-              dragging ? "border-ink bg-sunk" : "border-line-strong bg-card"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-          >
-            <span className="grid size-12 place-items-center rounded-full border-[1.5px] border-dashed border-line-strong text-ink-2">
-              <ImageUp
-                aria-hidden="true"
-                className="size-6"
-                strokeWidth={1.75}
-              />
-            </span>
-            <h2 className="t-h3">Add {aNoun}</h2>
-            <p className="text-[13px] text-muted-foreground">
-              JPG, PNG or WebP. Drop it here, paste it, or choose one.
-            </p>
-            {chooseLabel(
-              phase === "error" ? `Choose another ${noun}` : `Choose ${aNoun}`,
-            )}
-            <p className="text-center text-[13px] text-balance text-muted-foreground">
-              <Smartphone
-                aria-hidden="true"
-                className="mr-1.5 inline size-4 align-[-3px] text-accent-ink"
-                strokeWidth={2}
-              />
-              Your {noun} stays on this device. Nothing is uploaded.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {(phase === "working" || phase === "done") && original && (
-        <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1.25fr)_minmax(320px,1fr)] md:gap-5">
-          <div className="grid content-start gap-2">
-            <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-xl bg-rail">
-              <img
-                src={result?.url ?? original.url}
-                alt={
-                  result
-                    ? `Saved ${noun}, ${result.width} by ${result.height} pixels`
-                    : `Your ${noun} before compressing`
-                }
-                className="max-h-full max-w-full object-contain"
-              />
-              <span className="num absolute top-2.5 left-2.5 rounded-xs bg-image-scrim px-2 py-1 text-xs font-semibold text-on-image">
-                {!result
-                  ? `Original · ${formatFileSize(original.bytes)}`
-                  : pass
-                    ? `After · ${fig} KB`
-                    : `Best try · ${fig} KB`}
-              </span>
-              {phase === "working" && (
-                <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1.5 rounded-xs bg-image-scrim px-2.5 py-1.5 text-[13px] font-[550] text-on-image">
-                  <Smartphone
-                    aria-hidden="true"
-                    className="size-4"
-                    strokeWidth={2}
-                  />
-                  Working on this device
-                </span>
-              )}
-            </div>
-            <p className="num flex flex-wrap gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">
-              <b
-                className="font-semibold [overflow-wrap:anywhere] text-ink"
-                translate="no"
-              >
-                {original.name}
-              </b>
-              <span>
-                {result
-                  ? `${result.width} × ${result.height} px · ${fig} KB · was ${formatFileSize(original.bytes)}`
-                  : `${original.width} × ${original.height} px · ${formatFileSize(original.bytes)}`}
-              </span>
-            </p>
-            <div className="justify-self-start">
-              {chooseLabel(`Choose another ${noun}`, "outline")}
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-line bg-card">
-            {phase === "working" && (
-              <>
-                <div className="grid gap-2 border-b border-line p-4">
-                  <p className="st text-ink-2">
-                    <StatusGlyph status="work" />
-                    Making it smaller…
-                  </p>
-                  <p className="num">
-                    <b>Now {formatFileSize(original.bytes)}.</b> {ruleWords}
-                  </p>
-                  <FitsGauge
-                    lo={lo}
-                    hi={target.maxBytes}
-                    at={original.bytes}
-                    state="pending"
-                    label={`Now ${formatFileSize(original.bytes)}. ${ruleWords}`}
-                    loText={lo ? `${minBytesToKb(lo)} KB` : undefined}
-                    hiText={`${maxKb} KB limit`}
-                  />
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2.5 p-4">
-                  <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                    <Smartphone
-                      aria-hidden="true"
-                      className="size-4 text-accent-ink"
-                      strokeWidth={2}
-                    />
-                    Working on this device. No files uploaded.
-                  </p>
-                  <Button variant="outline" onClick={cancel}>
-                    Cancel
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {phase === "done" && result && (
-              <>
-                <div
-                  className={`grid gap-2.5 px-[18px] pt-[18px] pb-3.5 ${pass ? "on-band" : "bg-status-bad-soft text-ink"}`}
-                >
-                  <h2
-                    id={resultId}
-                    ref={resultHeading}
-                    tabIndex={-1}
-                    className="flex items-start gap-2 text-[15px] leading-snug font-[650]"
-                  >
-                    <StatusGlyph
-                      status={pass ? "fits" : "no"}
-                      className={`size-5 shrink-0 ${pass ? "" : "text-status-bad"}`}
-                    />
-                    {verdict}
-                  </h2>
-                  <Suspense
-                    fallback={
-                      <span className="figure">
-                        <b>{fig}</b>
-                        <span>KB</span>
-                      </span>
+          {(phase === "working" || phase === "done") && original && (
+            <div className="grid items-start md:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)]">
+              <div className="grid content-start gap-2 p-4 md:p-6">
+                <div className="relative grid aspect-[4/3] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] place-items-center overflow-hidden rounded-lg bg-rail">
+                  <img
+                    src={result?.url ?? original.url}
+                    alt={
+                      result
+                        ? `Saved image, ${result.width} by ${result.height} pixels`
+                        : "Your image before compressing"
                     }
-                  >
-                    <ExactSize fig={fig} bytes={formatBytes(result.bytes)} />
-                  </Suspense>
-                  <FitsGauge
-                    lo={lo}
-                    hi={target.maxBytes}
-                    at={result.bytes}
-                    state={pass ? "fits" : state}
-                    label={`${fig} KB. ${ruleWords}`}
-                    loText={lo ? `${minBytesToKb(lo)} KB` : undefined}
-                    hiText={`${maxKb} KB limit`}
+                    className="max-h-full max-w-full object-contain"
                   />
-                  <p
-                    className={`text-xs ${pass ? "text-on-band-muted" : "text-ink-2"}`}
-                  >
-                    {pass
-                      ? "We checked the saved file, not an estimate."
-                      : "This is the smallest we could make it at this size."}
-                  </p>
+                  <span className="num absolute top-2.5 left-2.5 rounded-xs bg-image-scrim px-2 py-1 text-xs font-semibold text-on-image">
+                    {!result
+                      ? `Original · ${formatFileSize(original.bytes)}`
+                      : pass
+                        ? `After · ${fig} KB`
+                        : `Best try · ${fig} KB`}
+                  </span>
+                  {phase === "working" && (
+                    <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1.5 rounded-xs bg-image-scrim px-2.5 py-1.5 text-[13px] font-[550] text-on-image">
+                      <Smartphone
+                        aria-hidden="true"
+                        className="size-4"
+                        strokeWidth={2}
+                      />
+                      Working on this device
+                    </span>
+                  )}
                 </div>
+                <p className="num flex flex-wrap gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">
+                  <b
+                    className="font-semibold [overflow-wrap:anywhere] text-ink"
+                    translate="no"
+                  >
+                    {original.name}
+                  </b>
+                  <span>
+                    {result
+                      ? `${result.width} × ${result.height} px · ${fig} KB · was ${formatFileSize(original.bytes)}`
+                      : `${original.width} × ${original.height} px · ${formatFileSize(original.bytes)}`}
+                  </span>
+                </p>
+                <div className="justify-self-start">
+                  {chooseLabel("Choose another image", "outline")}
+                </div>
+              </div>
 
-                {pass ? (
-                  <>
-                    <ul className="num grid gap-1.5 px-4 pt-3 pb-1 text-sm">
-                      <li className="flex items-center gap-2">
-                        <Check
-                          aria-hidden="true"
-                          className="size-[18px] text-status-ok"
-                          strokeWidth={2}
-                        />
-                        Size: {fig} KB{" "}
-                        <span className="text-muted-foreground">
-                          ({formatBytes(result.bytes)})
-                        </span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check
-                          aria-hidden="true"
-                          className="size-[18px] text-status-ok"
-                          strokeWidth={2}
-                        />
-                        Format: {FORMAT_NAME[result.format]}
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check
-                          aria-hidden="true"
-                          className="size-[18px] text-status-ok"
-                          strokeWidth={2}
-                        />
-                        Width and height: {result.width} × {result.height} px
-                      </li>
-                    </ul>
-                    {verified === false && (
-                      <p className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg bg-sunk px-3.5 py-3 text-sm">
-                        <StatusGlyph
-                          status="unv"
-                          className="mt-px size-5 shrink-0 text-status-warn"
-                        />
-                        <span>
-                          <b>Not checked yet.</b> Meets the size rule we have.
-                          Check your notice before you submit.
-                        </span>
-                      </p>
-                    )}
-                    <div className="px-4 pt-3.5">
-                      {/* A real link: Base UI's Button would give it role="button". */}
-                      <a
-                        className={cn(
-                          buttonVariants(),
-                          "h-14 w-full justify-start",
-                        )}
-                        href={result.url}
-                        download={result.filename}
-                      >
-                        <Download aria-hidden="true" />
-                        <span className="grid text-left leading-tight">
-                          Download image
-                          <small
-                            className="text-xs font-medium opacity-85"
-                            translate="no"
-                          >
-                            {result.filename}
-                          </small>
-                        </span>
-                      </a>
-                    </div>
-                    <div className="px-4 pt-3 pb-3.5">
-                      <p className="mb-0.5 text-xs font-semibold text-muted-foreground">
-                        Next
-                      </p>
-                      <button
-                        type="button"
-                        onClick={reset}
-                        className="grid min-h-11 w-full grid-cols-[1fr_16px] items-center gap-2.5 border-t border-line text-left text-[15px] font-[520]"
-                      >
-                        Make another {noun}
-                        <ChevronRight aria-hidden="true" className="size-4" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="grid gap-4 p-4">
-                    <p>
-                      At{" "}
-                      <span className="num">
-                        {result.width} × {result.height} px
-                      </span>
-                      , this image can't get{" "}
-                      {state === "under" ? "above" : "below"} {fig} KB.
+              {/* Phone: the result comes first, the preview after it. */}
+              <div
+                className={cn(
+                  "border-line md:min-h-full md:border-l",
+                  phase === "done"
+                    ? "order-first border-b md:order-none md:border-b-0"
+                    : "border-t md:border-t-0",
+                )}
+              >
+                {phase === "working" && (
+                  <div className="grid gap-3 p-4 md:p-6">
+                    <p className="st text-ink-2">
+                      <StatusGlyph status="work" />
+                      Making it smaller…
                     </p>
-                    {state === "over" && (
-                      <div className="grid gap-2 rounded-lg border border-line bg-paper p-3.5">
-                        <p className="text-[15px]">
-                          <b>Fix:</b>{" "}
-                          {rule
-                            ? `crop your ${kind} closer, or save it smaller, then add it again.`
-                            : "make it fewer pixels wide, then try again."}
-                        </p>
-                        {!rule && (
-                          <Button className="w-full" onClick={smaller}>
-                            Make it {Math.max(1, Math.round(result.width / 2))}{" "}
-                            px wide and try again
-                          </Button>
-                        )}
-                        {chooseLabel(`Choose another ${noun}`, "outline")}
-                      </div>
-                    )}
-                    <a
-                      className="inline-flex min-h-11 items-center gap-2 text-sm font-[550] underline"
-                      href={result.url}
-                      download={result.filename}
-                    >
-                      <Download aria-hidden="true" className="size-4" />
-                      Download the {fig} KB file anyway (
-                      {state === "under" ? "under" : "over"} your limit)
-                    </a>
+                    <p className="num">
+                      <b>Now {formatFileSize(original.bytes)}.</b> {ruleWords}
+                    </p>
+                    <FitsGauge
+                      hi={target.maxBytes}
+                      at={original.bytes}
+                      state="pending"
+                      label={`Now ${formatFileSize(original.bytes)}. ${ruleWords}`}
+                      hiText={`${maxKb} KB limit`}
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                      <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                        <Smartphone
+                          aria-hidden="true"
+                          className="size-4 text-accent-ink"
+                          strokeWidth={2}
+                        />
+                        Working on this device. No files uploaded.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="hidden md:inline-flex"
+                        onClick={job.cancel}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 )}
-              </>
-            )}
-          </div>
+
+                {phase === "done" && result && (
+                  <>
+                    <ResultBand
+                      id={resultId}
+                      headingRef={job.resultHeading}
+                      result={result}
+                      rule={target}
+                      originalBytes={original.bytes}
+                    />
+                    {pass ? (
+                      <div className="grid gap-3.5 px-4 pt-3.5 pb-4 md:px-[18px]">
+                        <ul className="num grid gap-1.5 text-sm">
+                          <li className="flex items-center gap-2">
+                            <Check
+                              aria-hidden="true"
+                              className="size-[18px] text-status-ok"
+                              strokeWidth={2}
+                            />
+                            Size: {fig} KB{" "}
+                            <span className="text-muted-foreground">
+                              ({formatBytes(result.bytes)})
+                            </span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <Check
+                              aria-hidden="true"
+                              className="size-[18px] text-status-ok"
+                              strokeWidth={2}
+                            />
+                            Format: {FORMAT_NAME[result.format]}
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <Check
+                              aria-hidden="true"
+                              className="size-[18px] text-status-ok"
+                              strokeWidth={2}
+                            />
+                            Width and height: {result.width} × {result.height}{" "}
+                            px
+                          </li>
+                        </ul>
+                        {/* A real link: Base UI's Button would give it role="button". */}
+                        <a
+                          className={cn(
+                            buttonVariants(),
+                            "hidden h-14 w-full justify-start md:flex",
+                          )}
+                          href={result.url}
+                          download={result.filename}
+                        >
+                          <Download aria-hidden="true" />
+                          <span className="grid text-left leading-tight">
+                            Download image
+                            <small
+                              className="text-xs font-medium opacity-85"
+                              translate="no"
+                            >
+                              {result.filename}
+                            </small>
+                          </span>
+                        </a>
+                        <div>
+                          <p className="mb-0.5 text-xs font-semibold text-muted-foreground">
+                            Next
+                          </p>
+                          <button
+                            type="button"
+                            onClick={job.reset}
+                            className="grid min-h-11 w-full cursor-pointer grid-cols-[1fr_16px] items-center gap-2.5 border-t border-line text-left text-[15px] font-[520] hover:bg-sunk"
+                          >
+                            Compress another image
+                            <ChevronRight
+                              aria-hidden="true"
+                              className="size-4"
+                            />
+                          </button>
+                          <a
+                            href="/#forms"
+                            className="grid min-h-11 w-full grid-cols-[1fr_16px] items-center gap-2.5 border-y border-line text-[15px] font-[520] text-ink no-underline hover:bg-sunk"
+                          >
+                            Use it for a form
+                            <ChevronRight
+                              aria-hidden="true"
+                              className="size-4"
+                            />
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4 p-4 md:px-[18px]">
+                        <p>
+                          At{" "}
+                          <span className="num">
+                            {result.width} × {result.height} px
+                          </span>
+                          , this image can't get below {fig} KB.
+                        </p>
+                        <div className="grid gap-2 rounded-lg border border-line bg-paper p-3.5">
+                          <p className="text-[15px]">
+                            <b>Fix:</b> make it fewer pixels wide, then try
+                            again.
+                          </p>
+                          <Button
+                            className="hidden w-full md:inline-flex"
+                            onClick={smaller}
+                          >
+                            Make it {halfWidth} px wide and try again
+                          </Button>
+                        </div>
+                        <a
+                          className="inline-flex min-h-11 items-center gap-2 text-sm font-[550] underline"
+                          href={result.url}
+                          download={result.filename}
+                        >
+                          <Download aria-hidden="true" className="size-4" />
+                          Download the {fig} KB file anyway (over your limit)
+                        </a>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Phone: one figure and one verb, at the bottom of the screen while the tool is on it. */}
+      <ActionBar
+        glyph={
+          result
+            ? pass
+              ? "fits"
+              : "no"
+            : phase === "working"
+              ? "work"
+              : "idle"
+        }
+        figure={
+          result
+            ? `${fig} KB`
+            : phase === "working" && original
+              ? `Now ${formatFileSize(original.bytes)}`
+              : limitText.replace(/^under/, "Under")
+        }
+        caption={
+          result
+            ? pass
+              ? `Under your ${maxKb} KB limit`
+              : `Your limit is ${maxKb} KB`
+            : phase === "working"
+              ? "Making it smaller…"
+              : "Your limit"
+        }
+        bad={Boolean(result && !pass)}
+      >
+        {phase === "done" && result && pass ? (
+          <a
+            className={cn(buttonVariants())}
+            href={result.url}
+            download={result.filename}
+          >
+            <Download aria-hidden="true" />
+            Download image
+          </a>
+        ) : phase === "done" && result ? (
+          <Button onClick={smaller}>Make it {halfWidth} px wide</Button>
+        ) : phase === "working" ? (
+          <Button variant="outline" onClick={job.cancel}>
+            Cancel
+          </Button>
+        ) : (
+          chooseLabel(
+            phase === "error" ? "Choose another image" : "Choose an image",
+          )
+        )}
+      </ActionBar>
     </div>
   );
 }

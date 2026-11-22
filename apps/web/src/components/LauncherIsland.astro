@@ -1,0 +1,12 @@
+---
+import { Launcher, type LauncherProps } from "./Launcher";
+import Island from "./Island.astro";
+
+type Props = LauncherProps;
+---
+
+<Island name="launcher" component={Launcher} props={{ ...Astro.props }} />
+
+<script>
+  import "../islands/launcher";
+</script>

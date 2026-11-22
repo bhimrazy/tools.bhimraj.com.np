@@ -51,16 +51,31 @@ export interface Preset {
   source: { url: string; label: string } | null;
   /** YYYY-MM-DD the size rule was last checked against `source`; null = not checked */
   verifiedAt: string | null;
+  /** The form's own name in its local script, shown beside the English one and matched by search. */
+  formLocalName?: { lang: "ne" | "bn"; text: string };
   notes?: string;
 }
 
-export const presets: readonly Preset[] = [...np, ...bd, ...us];
+export const presets: readonly Preset[] = [...np, ...us, ...bd];
 
+/** The order countries are listed in, set by the owner; not alphabetical. Unlisted ones follow. */
+export const COUNTRY_ORDER: readonly string[] = ["NP", "US", "BD"];
+
+const countryRank = (code: string) => {
+  const i = COUNTRY_ORDER.indexOf(code);
+  return i === -1 ? COUNTRY_ORDER.length : i;
+};
+
+/** Presets by country, in `COUNTRY_ORDER`. */
 export function groupByCountry(
   list: readonly Preset[] = presets,
 ): Map<string, Preset[]> {
   const map = new Map<string, Preset[]>();
-  for (const p of list) map.set(p.country, [...(map.get(p.country) ?? []), p]);
+  const sorted = [...list].sort(
+    (a, b) => countryRank(a.country) - countryRank(b.country),
+  );
+  for (const p of sorted)
+    map.set(p.country, [...(map.get(p.country) ?? []), p]);
   return map;
 }
 

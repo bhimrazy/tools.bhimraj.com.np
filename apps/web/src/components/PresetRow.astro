@@ -1,28 +1,44 @@
 ---
-import { uploadPath, type Preset } from "@tools/presets";
+import { formPath, uploadPath, type Preset } from "@tools/presets";
 import ChevronRight from "lucide-react/icons/chevron-right";
 import { Silhouette } from "./brand/Silhouette";
-import { formatChecked, formatSizeRule } from "../lib/format";
+import { StatusGlyph } from "./brand/StatusGlyph";
+import { formatDate, formatSizeRule } from "../lib/format";
 
 interface Props {
   preset: Preset;
 }
 const { preset } = Astro.props;
 const { width, height } = preset.rule;
+const kind = preset.kind.charAt(0).toUpperCase() + preset.kind.slice(1);
 ---
 
 <a
   href={uploadPath(preset)}
-  class="grid min-h-[60px] grid-cols-[40px_minmax(0,1fr)_16px] items-center gap-x-3 border-b border-line py-2.5 text-ink no-underline hover:bg-card"
+  data-form-path={formPath(preset)}
+  class="group grid min-h-16 grid-cols-[40px_minmax(0,1fr)_16px] items-center gap-x-3 gap-y-0.5 border-t border-line px-1 py-2 text-ink no-underline transition-colors hover:bg-card md:grid-cols-[40px_minmax(0,1fr)_minmax(0,auto)_8.5rem_16px] md:gap-x-4"
 >
-  <Silhouette width={width ?? 1} height={height ?? width ?? 1} />
-  <span class="grid min-w-0">
-    <span class="text-[15px] leading-snug font-semibold">{preset.title}</span>
-    <span class="num text-[13px] text-muted-foreground">
-      <span translate="no">{formatSizeRule(preset.rule)}</span>{" · "}<span class:list={[preset.verifiedAt && "text-ink"]}
-        >{formatChecked(preset)}</span
-      >
-    </span>
+  <span class="row-span-3 self-start md:row-span-1 md:self-center"><Silhouette width={width ?? 1} height={height ?? width ?? 1} /></span>
+  <span class="min-w-0 text-[15px] leading-snug font-semibold"><span class="sr-only">{preset.formTitle}: </span>{kind}</span>
+  <ChevronRight
+    aria-hidden="true"
+    className="row-span-3 size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 md:order-last md:row-span-1"
+    strokeWidth={2}
+  />
+  <span class="num col-start-2 text-[13px] text-muted-foreground md:col-start-auto md:text-sm md:whitespace-nowrap md:text-ink-2" translate="no">
+    {formatSizeRule(preset.rule)}
   </span>
-  <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={2} />
+  <span class="col-start-2 md:col-start-auto">
+    {
+      // A rule's source is plain text; the Fits glyph is kept for files.
+      preset.verifiedAt ? (
+        <span class="text-[13px] font-semibold text-ink">Checked {formatDate(preset.verifiedAt)}</span>
+      ) : (
+        <span class="st text-[12px] font-[550] text-muted-foreground md:text-[13px]">
+          <StatusGlyph status="unv" className="text-status-warn" />
+          Not checked
+        </span>
+      )
+    }
+  </span>
 </a>

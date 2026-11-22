@@ -1,0 +1,12 @@
+---
+import { FormKit, type FormKitProps } from "./FormKit";
+import Island from "./Island.astro";
+
+type Props = FormKitProps;
+---
+
+<Island name="kit" component={FormKit} props={{ ...Astro.props }} />
+
+<script>
+  import "../islands/form-kit";
+</script>

@@ -1,5 +1,13 @@
 import { setPendingFile } from "./pending-file";
 
+/** The file input a drop or paste on `target` is meant for: its slot's, else the island's first. */
+const findInputId = (island: HTMLElement, target: EventTarget | null) => {
+  const slot =
+    target instanceof Element ? target.closest("[data-tool-slot]") : null;
+  return (slot ?? island).querySelector<HTMLInputElement>('input[type="file"]')
+    ?.id;
+};
+
 const INTENT = [
   "pointerdown",
   "touchstart",
@@ -14,6 +22,7 @@ const isReady = (el: Element) => el.hasAttribute("data-island-ready");
  * HTML and CSS until someone touches the tool (docs/product-standards.md: at most 50 KB gzip
  * before a file is chosen). The server HTML already works: a file picked, dropped or pasted
  * before the code arrives is kept with setPendingFile and taken by the island when it mounts.
+ * A URL with a query (a size rule from search, or a file from the home page) loads it at once.
  */
 export function loadIslandOnUse(
   name: string,
@@ -29,11 +38,16 @@ export function loadIslandOnUse(
       for (const el of islands) mod.hydrate(el);
     });
   };
-  const keep = (el: HTMLElement, file: File | undefined) => {
-    if (!file) return;
-    setPendingFile(el, file);
+  const keep = (
+    el: HTMLElement,
+    inputId: string | undefined,
+    file: File | undefined,
+  ) => {
+    if (!file || !inputId) return;
+    setPendingFile(el, inputId, file);
     start();
   };
+  if (location.search) start();
 
   for (const el of islands) {
     for (const type of INTENT)
@@ -44,7 +58,7 @@ export function loadIslandOnUse(
     el.addEventListener("drop", (e) => {
       if (isReady(el)) return;
       e.preventDefault();
-      keep(el, e.dataTransfer?.files[0]);
+      keep(el, findInputId(el, e.target), e.dataTransfer?.files[0]);
     });
     el.addEventListener("change", (e) => {
       const input = e.target;
@@ -54,7 +68,7 @@ export function loadIslandOnUse(
         input.type !== "file"
       )
         return;
-      keep(el, input.files?.[0]);
+      keep(el, input.id, input.files?.[0]);
       input.value = "";
     });
   }
@@ -68,6 +82,6 @@ export function loadIslandOnUse(
     );
     if (!file) return;
     e.preventDefault();
-    keep(el, file);
+    keep(el, findInputId(el, document.activeElement), file);
   });
 }
