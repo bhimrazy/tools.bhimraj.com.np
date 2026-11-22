@@ -20,7 +20,9 @@ test("free-size 12 MP photo compresses to 100 KB", async ({
   expect(filename).toMatch(/^holiday-photo-\d+x\d+-\d+kb\.jpg$/);
   const { width, height } = await decodeImage(page, buffer);
   expect(width / height).toBeCloseTo(4 / 3, 1);
-  await expect(page.getByText(/under your 100 KB limit$/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /under your 100 KB limit$/ }),
+  ).toBeVisible();
 });
 
 test("Lok Sewa photo preset gives exactly 300x350 inside its byte window", async ({
@@ -118,4 +120,29 @@ test("a form page holds one tool per upload, each with its own size rule", async
     );
     await expect(section.getByText(box).first()).toBeVisible();
   }
+});
+
+test("a limit typed and a file picked before the tool's code loads are both used", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  // Hold back the island's code until the user has typed and picked.
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route(/compress-tool-hydrate.*\.js$/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto("/compress-image");
+  await page.getByLabel("Size limit (KB)").fill("20");
+  await pickFile(
+    page,
+    await makeImage(page, { name: "early.jpg", width: 2400, height: 1800 }),
+  );
+  release();
+
+  const { buffer } = await downloadResult(page, testInfo);
+  // 20 KB with the 1% headroom: at most 19,800 bytes.
+  expect(buffer.length).toBeLessThanOrEqual(19_800);
+  await expect(page.getByLabel("Size limit (KB)")).toHaveValue("20");
 });

@@ -47,8 +47,8 @@ React DOM is about 68 KiB of the first-use load. The format select and the exact
 The first-use load starts when someone touches the tool, which is usually before the file picker
 closes; on a slow connection the tool may need a moment to respond to its first click.
 
-`command` depends on `cmdk`, which pulls four Radix packages; it is installed for search but
-not yet used on any page, so none of it ships.
+Only the components a page uses are installed (button, input, select, tooltip); others are added
+with `bunx shadcn add` when a feature needs them.
 
 ## Revisit
 

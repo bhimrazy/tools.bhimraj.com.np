@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { getGaugeState } from "../lib/gauge";
 import { markIslandReady, takePendingFile } from "../lib/pending-file";
 import { formatBytes, formatFigureKb, formatFileSize } from "../lib/units";
+import { formatVerdict } from "../lib/verdict";
 import { FitsGauge } from "./brand/FitsGauge";
 import { StatusGlyph } from "./brand/StatusGlyph";
 
@@ -192,6 +193,8 @@ export function CompressTool({
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const kbInput = useRef<HTMLInputElement>(null);
+  const wInput = useRef<HTMLInputElement>(null);
+  const hInput = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
 
   const target: SizeRule = rule ?? toCustomRule(kb, w, h, format);
@@ -229,10 +232,16 @@ export function CompressTool({
   useEffect(() => {
     const island = root.current?.closest("[data-island]");
     markIslandReady(island);
-    const typed = kbInput.current?.value;
-    if (typed && typed !== kb) setKb(typed);
+    // Values typed into the server HTML before hydration live only in the DOM.
+    const typedKb = kbInput.current?.value || kb;
+    const typedW = wInput.current?.value ?? w;
+    const typedH = hInput.current?.value ?? h;
+    setKb(typedKb);
+    setW(typedW);
+    setH(typedH);
     const waiting = takePendingFile(island);
-    if (waiting) void run(waiting);
+    if (waiting)
+      void run(waiting, rule ?? toCustomRule(typedKb, typedW, typedH, format));
   }, []);
 
   useEffect(() => {
@@ -305,6 +314,7 @@ export function CompressTool({
     setOriginal(null);
     setFile(null);
     setPhase("empty");
+    requestAnimationFrame(() => fileInput.current?.focus());
   };
 
   const reset = () => {
@@ -349,7 +359,7 @@ export function CompressTool({
       ref={fileInput}
       id={inputId}
       name="file"
-      className="peer sr-only"
+      className="sr-only"
       type="file"
       accept="image/*"
       onChange={onInput}
@@ -363,7 +373,8 @@ export function CompressTool({
       htmlFor={inputId}
       className={cn(
         buttonVariants({ variant }),
-        "cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
+        // The input is visually hidden, so its keyboard focus is drawn on every label for it.
+        "cursor-pointer group-has-[input[type=file]:focus-visible]/tool:outline-2 group-has-[input[type=file]:focus-visible]/tool:outline-offset-2 group-has-[input[type=file]:focus-visible]/tool:outline-ring",
       )}
     >
       {text}
@@ -382,10 +393,19 @@ export function CompressTool({
   const state = result
     ? getGaugeState(result.bytes, target.maxBytes, lo)
     : "empty";
+  const reading = phase === "working" && !original;
+  const verdict = result ? formatVerdict(result.bytes, target) : "";
+  const announcement = reading
+    ? `Reading your ${noun}…`
+    : phase === "working"
+      ? `Making it smaller on this device…`
+      : phase === "done"
+        ? verdict
+        : "";
   const fig = result ? formatFigureKb(result.bytes, pass) : "";
 
   return (
-    <div className="grid gap-4 md:gap-5" ref={root}>
+    <div className="group/tool grid gap-4 md:gap-5" ref={root}>
       {/* The task, said as one sentence. */}
       <div className="rounded-xl border border-line bg-card p-3.5 md:px-5 md:py-[18px]">
         {rule ? (
@@ -475,6 +495,7 @@ export function CompressTool({
                 Width (px)
                 <Input
                   className="w-28"
+                  ref={wInput}
                   name="width"
                   type="number"
                   inputMode="numeric"
@@ -489,6 +510,7 @@ export function CompressTool({
                 Height (px)
                 <Input
                   className="w-28"
+                  ref={hInput}
                   name="height"
                   type="number"
                   inputMode="numeric"
@@ -513,16 +535,28 @@ export function CompressTool({
         )}
       </div>
 
+      {/* One live region, always mounted, so each change is announced. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </p>
+
       {/* The work slot. */}
       {fileInputEl}
-      {(phase === "empty" || phase === "error") && (
+      {(phase === "empty" || phase === "error" || reading) && (
         <div className="grid gap-4">
           <div className="rounded-xl border border-line bg-card px-4 pt-3.5 pb-1">
             <div className="flex flex-wrap justify-between gap-2 text-sm">
-              <span className="st text-muted-foreground">
-                <StatusGlyph status="idle" />
-                No {noun} yet
-              </span>
+              {reading ? (
+                <span className="st text-ink-2">
+                  <StatusGlyph status="work" />
+                  Reading your {noun}…
+                </span>
+              ) : (
+                <span className="st text-muted-foreground">
+                  <StatusGlyph status="idle" />
+                  No {noun} yet
+                </span>
+              )}
               <span className="num font-semibold">Your limit: {limitText}</span>
             </div>
             <FitsGauge
@@ -641,7 +675,7 @@ export function CompressTool({
             {phase === "working" && (
               <>
                 <div className="grid gap-2 border-b border-line p-4">
-                  <p className="st text-ink-2" role="status">
+                  <p className="st text-ink-2">
                     <StatusGlyph status="work" />
                     Making it smaller…
                   </p>
@@ -689,11 +723,7 @@ export function CompressTool({
                       status={pass ? "fits" : "no"}
                       className={`size-5 shrink-0 ${pass ? "" : "text-status-bad"}`}
                     />
-                    {pass
-                      ? `Done: ${fig} KB, ${lo ? `inside your ${limitText} limit` : `under your ${maxKb} KB limit`}`
-                      : state === "under"
-                        ? `Too small: ${fig} KB. The smallest allowed is ${minBytesToKb(lo ?? 0)} KB.`
-                        : `Too big: ${fig} KB. Your limit is ${maxKb} KB.`}
+                    {verdict}
                   </h2>
                   <Suspense
                     fallback={

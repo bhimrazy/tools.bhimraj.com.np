@@ -16,7 +16,8 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
 - **Host-neutral.** The production host lives only in `packages/site/src/origin.ts`
   and `apps/web/wrangler.jsonc`; `bun run check:host` fails otherwise.
 - **Permissive dependencies only** (MIT/BSD/Apache/MPL) until the v2 licence decision;
-  no AGPL libraries, no non-commercial models.
+  no AGPL libraries, no non-commercial models. Exception: fonts may be OFL-1.1, self-hosted and
+  unmodified (Onest, Noto Sans Devanagari, Noto Sans Bengali).
 
 ## Conventions
 
