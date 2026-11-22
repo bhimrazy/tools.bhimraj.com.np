@@ -10,8 +10,8 @@ Vercel's Git integration is off (`git.deploymentEnabled: false` in `apps/web/ver
 | `vercel-cleanup.yml` | By hand from `main`                                 | Deletes old deployments after approval        |
 
 The Vercel project is `tools`: root directory `apps/web`, framework Astro, install
-`bun install --frozen-lockfile`, build `bun run build`, output `dist`. Its production address is
-`tools-bhimraj.vercel.app` until the custom domain is linked.
+`bun install --frozen-lockfile`, build `bun run build`, output `dist`. It serves production at
+`tools.bhimraj.com.np` (see [Domains](#domains)).
 
 ## Headers and URLs
 
@@ -94,17 +94,16 @@ expires, or if it may have leaked:
 3. Run **Vercel Production** by hand on `main` and check it deploys.
 4. Delete the old token in Vercel.
 
-## Linking the custom domain
+## Domains
 
-The owner does this once. The host is the one in `packages/site/src/origin.ts`, and nothing in the
-repo changes.
+Domains are configured in Vercel only (project `tools` → Settings → Domains). No workflow or app
+code reads them. The canonical host comes from `packages/site/src/origin.ts`.
 
-1. Vercel → project `tools` → Settings → Domains → Add, enter the host and attach it to Production.
-2. At the DNS provider, add the record Vercel shows (a `CNAME` for a subdomain). If the zone is on
-   Cloudflare, set it to DNS only (not proxied), and first remove the old Workers custom domain or
-   route for that host so the records don't conflict.
-3. Wait for Vercel to show the domain as valid and issue the certificate. Production deploys are
-   aliased to it automatically from then on.
-4. Check it: `curl -sI https://<host>/compress-image` shows `content-security-policy` and a 200,
-   and `https://<host>/compress-image.html` answers 308.
-5. Once it serves, delete the old Cloudflare Worker.
+- `tools.bhimraj.com.np` is the production domain, verified by `CNAME` with HTTPS and HSTS.
+  Every production deploy is aliased to it automatically.
+- `tools-bhimraj.vercel.app` and `tools-omega-ten.vercel.app` redirect to it with a 308.
+- Check it: `curl -sI https://tools.bhimraj.com.np/compress-image` shows `content-security-policy`
+  and a 200, and `/compress-image.html` answers 308. `//example.com/` redirects to the same-origin
+  `/example.com/`, not off-site (`serve-dist` answers such paths with a 404).
+- To move hosts later, add the new domain in Vercel and make the old one redirect to it. Then
+  change `origin.ts`; see [ADR 0003](adr/0003-site-origin.md).
