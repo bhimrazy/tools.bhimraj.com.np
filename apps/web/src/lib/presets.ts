@@ -40,3 +40,25 @@ export const formatDate = (iso: string) =>
     year: "numeric",
     timeZone: "UTC",
   });
+
+/** Countries whose own name is shown in its script; needs the matching font on the page. */
+const NATIVE: Record<string, { lang: string; script: "deva" | "beng" }> = {
+  NP: { lang: "ne", script: "deva" },
+  IN: { lang: "hi", script: "deva" },
+  BD: { lang: "bn", script: "beng" },
+};
+
+export function nativeCountry(code: string) {
+  const n = NATIVE[code];
+  if (!n) return null;
+  const name = new Intl.DisplayNames([n.lang], { type: "region" }).of(code);
+  return name ? { ...n, name } : null;
+}
+
+/** The size rule as one line, e.g. "300 × 350 px · 10–200 KB". */
+export const ruleLine = (p: Preset) =>
+  [dimensions(p), sizeRange(p)].filter(Boolean).join(" · ");
+
+/** Where the rule came from, in plain words. */
+export const ruleChecked = (p: Preset) =>
+  p.verifiedAt ? `Checked ${formatDate(p.verifiedAt)}` : "Not checked";

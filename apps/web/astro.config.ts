@@ -1,4 +1,4 @@
-import preact from "@astrojs/preact";
+import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import { siteOrigin } from "@tools/seo";
 import { defineConfig } from "astro/config";
@@ -16,7 +16,7 @@ export default defineConfig({
   // serves at /compress-image without a redirect, matching trailingSlash "never".
   trailingSlash: "never",
   build: { format: "file", inlineStylesheets: "never" },
-  integrations: [preact()],
+  integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
     build: { assetsInlineLimit: 0 },

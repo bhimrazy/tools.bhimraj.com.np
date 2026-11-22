@@ -1,12 +1,14 @@
 ---
+import { cn } from "cn";
+import { buttonVariants } from "../components/ui/button";
 import Base from "../layouts/Base.astro";
 ---
 
 <Base title="Page not found" description="This page doesn't exist." path="/404" noindex>
-  <div class="grid gap-4 py-8">
-    <span class="badge badge-neutral w-fit font-mono">404</span>
-    <h1 class="text-3xl tracking-tight">Page not found</h1>
-    <p class="text-muted">The link may be old, or the form preset may have moved.</p>
-    <p><a href="/" class="btn-primary">Browse all tools</a></p>
+  <div class="grid justify-items-start gap-4 py-8">
+    <p class="num text-[13px] font-semibold text-muted-foreground">404</p>
+    <h1 class="t-h1">Page not found</h1>
+    <p class="text-ink-2">The link may be old, or the form may have moved.</p>
+    <a href="/" class={cn(buttonVariants())}>See all forms and tools</a>
   </div>
 </Base>
