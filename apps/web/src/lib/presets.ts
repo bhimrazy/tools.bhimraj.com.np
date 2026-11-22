@@ -6,7 +6,6 @@ export const countryName = (code: string) => regions.of(code) ?? code;
 
 export const FORMAT_LABEL: Record<ImageFormat, string> = {
   "image/jpeg": "JPEG (.jpg)",
-  "image/png": "PNG",
   "image/webp": "WebP",
 };
 
