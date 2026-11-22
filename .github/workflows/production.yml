@@ -43,8 +43,9 @@ jobs:
           fetch-depth: 0 # to diff against the last deployed commit
           persist-credentials: false
 
-      # Skips when only docs, tests or CI changed since the newest production deploy, and when that
-      # deploy's commit can't be read (fails closed; run by hand). A manual run needs CI green.
+      # Skips when only docs, tests or CI changed since the newest production deploy made here (it
+      # carries the commit in its meta; one made elsewhere doesn't, and an older base only deploys
+      # more). Fails closed if Vercel can't be read; run by hand then. A manual run needs CI green.
       - id: gate
         env:
           EVENT: ${{ github.event_name }}
@@ -61,13 +62,13 @@ jobs:
             deploy "Manual run of ${SHA:0:7}."
           fi
           last=$(curl -fsS -H @- \
-            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&state=READY&limit=1" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&state=READY&limit=20" \
             <<< "Authorization: Bearer $VERCEL_TOKEN" |
-            jq -er '.deployments | if length == 0 then "none" else .[0].meta.githubCommitSha // "" end') ||
+            jq -er '[.deployments[].meta.githubCommitSha // empty][0] // "none"') ||
             skip "can't read the last production deploy from Vercel."
-          [ "$last" != none ] || deploy "First production deploy."
+          [ "$last" != none ] || deploy "No production deploy from this workflow yet."
           git cat-file -e "$last^{commit}" 2>/dev/null ||
-            skip "the last production deploy's commit (${last:-unknown}) isn't on main."
+            skip "the last production deploy's commit (${last:0:7}) isn't in this checkout."
           # grep exits 1 when nothing is left; that means nothing ships.
           shipped=$(git diff --name-only "$last" "$SHA" |
             grep -vE '^(docs|bench|scripts|\.github|\.claude|\.githooks|apps/web/e2e)/|\.md$|\.test\.ts$' || true)

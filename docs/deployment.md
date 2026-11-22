@@ -41,19 +41,22 @@ token as a production credential. The full fix is a separate preview project wit
 Opening, pushing to or marking ready a non-draft PR from this repository deploys a preview. The
 workflow then posts the URL in a PR comment and updates that comment on later pushes. A newer push
 cancels the deploy in flight. PRs that change only docs, Markdown, e2e tests or the benchmark don't
-deploy. Vercel marks preview URLs `noindex`, and their canonical links point at production.
+deploy. Preview URLs sit behind Vercel's Deployment Protection (team sign-in) and send
+`X-Robots-Tag: noindex`; their canonical links point at production.
 
 ## Production
 
 After CI succeeds on a push to `main`, `production.yml` checks out the commit CI tested. Before
-deploying, it asks the Vercel API for the newest ready production deployment and reads its
-`meta.githubCommitSha`, which every production deploy sets with `--meta`. It then:
+deploying, it asks the Vercel API for the newest ready production deployment that has a
+`meta.githubCommitSha`, which this workflow sets with `--meta` on every deploy. Deploys made any
+other way don't have one, so they are passed over, and comparing with an older commit can only
+deploy more. It then:
 
-- deploys when there is no production deployment yet (the first merge);
+- deploys when no production deployment carries the meta yet (the first merge after this setup);
 - **skips** when only docs, Markdown, tests, the benchmark, repo scripts or `.github/` changed
   (a Vercel CLI bump still deploys). The next merge that ships deploys everything;
-- **skips with a warning** when Vercel can't be read, or the last deploy has no commit SHA or one
-  missing from `main`. It fails closed, so run it by hand.
+- **skips with a warning** when Vercel can't be read or the recorded commit isn't in the
+  checkout. It fails closed, so run it by hand.
 
 To deploy by hand, go to Actions → **Vercel Production** → Run workflow on `main`. A manual run
 deploys `main`'s head once CI has passed on it.
