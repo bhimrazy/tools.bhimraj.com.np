@@ -8,9 +8,8 @@
     "dev": "astro dev",
     "build": "astro build && bun scripts/check-csp.ts",
     "check:csp": "bun scripts/check-csp.ts",
-    "preview": "wrangler dev",
+    "preview": "bun scripts/serve-dist.ts",
     "typecheck": "astro check",
-    "deploy": "wrangler deploy",
     "e2e": "playwright test"
   },
   "dependencies": {
@@ -27,7 +26,6 @@
     "@tailwindcss/vite": "4.3.5",
     "@tools/tsconfig": "workspace:*",
     "tailwindcss": "4.3.5",
-    "typescript": "catalog:",
-    "wrangler": "4.159.0"
+    "typescript": "catalog:"
   }
 }

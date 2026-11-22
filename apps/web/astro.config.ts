@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { siteOrigin } from "@tools/site";
 import { defineConfig } from "astro/config";
 
-// CSP: public/_headers ships `script-src 'self'; style-src 'self'` with no hashes.
+// CSP: vercel.json ships `script-src 'self'; style-src 'self'` with no hashes.
 // Astro `client:*` islands always inject an inline <script> + <style> (astro-island runtime),
 // which that policy blocks, and Astro's `security.csp` only emits a <meta> policy, not our header.
 // So islands are hydrated by a bundled module script instead (src/components/CompressIsland.astro),
@@ -12,8 +12,8 @@ import { defineConfig } from "astro/config";
 export default defineConfig({
   site: siteOrigin().href,
   output: "static",
-  // "file" emits /compress-image.html, which Cloudflare's `drop-trailing-slash` html_handling
-  // serves at /compress-image without a redirect, matching trailingSlash "never".
+  // "file" emits /compress-image.html, which vercel.json's `cleanUrls` serves at /compress-image
+  // (and `trailingSlash: false` redirects /compress-image/ there), matching trailingSlash "never".
   trailingSlash: "never",
   build: { format: "file", inlineStylesheets: "never" },
   integrations: [preact()],

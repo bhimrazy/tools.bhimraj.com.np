@@ -3,7 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "vite";
 import type { JobResult } from "./src/main";
 
-const PORT = 4402;
+// Not 4402: the e2e suite reuses a server already on its port.
+const PORT = 4403;
 const THROTTLE = 4; // CPU slowdown as a rough proxy for a low-end Android phone
 
 const server = await createServer({

@@ -4,8 +4,8 @@ const PORT = 4402;
 const executablePath = process.env.BROWSER_PATH;
 const launchOptions = executablePath ? { executablePath } : {};
 
-// Black-box suite against the built site: run `bun run build` first. wrangler serves ./dist
-// with the real `_headers` (CSP), offline and without login.
+// Black-box suite against the built site: run `bun run build` first. scripts/serve-dist.ts
+// serves ./dist with vercel.json's headers (CSP) and clean URLs, as production does.
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.e2e.ts",
@@ -27,10 +27,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `bunx wrangler dev --port ${PORT} --ip 127.0.0.1`,
+    command: `bun scripts/serve-dist.ts --port ${PORT}`,
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-    env: { WRANGLER_SEND_METRICS: "false" },
+    timeout: 30_000,
   },
 });

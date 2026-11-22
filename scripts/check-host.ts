@@ -6,15 +6,12 @@ const ROOT = join(import.meta.dir, "..");
 const HOST = "bhimraj.com.np";
 // The GitHub repo is named after the host; links to it are fine.
 const REPO = /github\.com\/bhimrazy\/tools\.bhimraj\.com\.np/g;
-const ALLOWED = new Set([
-  "packages/site/src/origin.ts",
-  "apps/web/wrangler.jsonc",
-]);
+const ALLOWED = new Set(["packages/site/src/origin.ts"]);
 
 const files = await Array.fromAsync(
   new Bun.Glob(
-    "{apps,packages}/**/{*.{ts,tsx,astro,js,mjs,json,jsonc,css,html,svg,xml,txt,md,mdx,webmanifest},_headers,_redirects}",
-  ).scan({ cwd: ROOT }),
+    "{apps,packages,.github}/**/*.{ts,tsx,astro,js,mjs,json,jsonc,css,html,svg,xml,txt,md,mdx,webmanifest,yml,yaml,sh}",
+  ).scan({ cwd: ROOT, dot: true }),
 );
 const scanned = files.filter(
   (f) => !f.includes("node_modules/") && !f.includes("/dist/"),
