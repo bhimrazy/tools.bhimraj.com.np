@@ -68,6 +68,12 @@ export function createHandler(dist: string, config: VercelConfig) {
     return (await file.exists()) ? file : null;
   };
 
+  const notFound = async () =>
+    new Response((await fileAt("404.html")) ?? "Not Found", {
+      status: 404,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     let path: string;
@@ -77,6 +83,8 @@ export function createHandler(dist: string, config: VercelConfig) {
       return new Response("Bad Request", { status: 400 });
     }
 
+    // A redirect to "//host" would leave the site; no real path starts with "//".
+    if (path.startsWith("//")) return withHeaders(path, await notFound());
     // Same order as Vercel's cleanUrls/trailingSlash routes, which run before `headers`, so
     // these 308s carry no custom headers there either.
     const index = path.match(/^\/(?:(.+)\/)?index(?:\.html)?\/?$/);
@@ -91,14 +99,7 @@ export function createHandler(dist: string, config: VercelConfig) {
       (await fileAt(`${path}.html`)) ??
       (await fileAt(join(path, "index.html")));
     if (file) return withHeaders(path, new Response(file));
-    const notFound = await fileAt("404.html");
-    return withHeaders(
-      path,
-      new Response(notFound ?? "Not Found", {
-        status: 404,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      }),
-    );
+    return withHeaders(path, await notFound());
   };
 }
 

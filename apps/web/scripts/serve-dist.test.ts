@@ -77,6 +77,7 @@ describe("createHandler", () => {
       "/_astro",
       "/../outside.txt",
       "/%2e%2e/outside.txt",
+      "//example.com/",
     ]) {
       const res = await get(path);
       expect(res.status).toBe(404);
