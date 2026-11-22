@@ -12,13 +12,13 @@ A **tool page** is any page that accepts a file, including every preset page.
 - Every claim on the site is true today and can be checked by a visitor. "Works offline" appears only once a service
   worker makes airplane mode work.
 
-## Specs
+## Size rules
 
-- Every preset page shows its source, and either "Last verified <date>" or a visible "Unverified" badge, plus a link
-  to report a changed spec.
-- "Verified" means every figure was read on an official source on that date.
-- The result shows the output's actual pixel size, format and size next to the spec, with a clear pass or fail. A file
-  that misses the spec is never presented as done.
+- Every form page shows each size rule's source, and either "Checked <date>" or a visible "Not checked yet" badge, plus
+  a "Report a different rule" link.
+- "Checked" means every figure was read on an official source on that date.
+- The result shows the output's actual pixel size, format and size next to the size rule, with a clear pass or fail. A
+  file that misses the size rule is never presented as done.
 - Nothing is cropped silently: signatures and scans are fitted onto the background colour; photos crop only inside a
   frame the user can see and move.
 - Sizes are shown the way the portal states them (KB); the exact byte count is in the result details.
@@ -27,7 +27,7 @@ A **tool page** is any page that accepts a file, including every preset page.
 
 - The tool is the first thing on the page; explanation comes after.
 - Works at 360px with no horizontal scroll, in light and dark.
-- A 12 MP photo finishes in under 3 s in Chrome with 4× CPU throttling; engine PRs state the measured time.
+- A 12 MP photo finishes in under 3 s in Chrome with 4× CPU throttling; `packages/image` PRs state the measured time.
 - Pages without a tool ship no JavaScript; a tool page ships at most 50 KB gzip before a file is chosen.
 - Keyboard reachable, visible focus, WCAG AA contrast, 44px tap targets.
 - Errors say what happened and what to do next; nothing fails silently.
@@ -37,4 +37,4 @@ A **tool page** is any page that accepts a file, including every preset page.
 ## Search
 
 - Every page has a unique title and description, one canonical URL, and is in the sitemap.
-- Every preset page is tied to a distinct, cited spec; no page exists only to target a keyword.
+- Every form page is tied to distinct, cited size rules; no page exists only to target a keyword.

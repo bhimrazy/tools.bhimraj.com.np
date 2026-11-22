@@ -16,8 +16,8 @@ future channel uses the semantic tokens below, not raw colours.
 | `text`                                | `#18181b` | `#f4f4f5` | body text and headings                        |
 | `muted`                               | `#52525b` | `#a1a1aa` | secondary text (≥ 4.5:1 on bg and surface)    |
 | `accent` (`-hover`, `-fg`, `-subtle`) | `#2453c9` | `#7c9cf5` | links, primary button, focus ring, drag state |
-| `success` / `-subtle`                 | `#15803d` | `#4ade80` | within target, verified                       |
-| `warning` / `-subtle`                 | `#a14a00` | `#fbbf24` | unverified spec                               |
+| `success` / `-subtle`                 | `#15803d` | `#4ade80` | fits the size rule, checked                   |
+| `warning` / `-subtle`                 | `#a14a00` | `#fbbf24` | size rule not checked yet                     |
 | `danger` / `-subtle`                  | `#b91c1c` | `#f87171` | errors, over the limit                        |
 
 Dark mode follows `prefers-color-scheme` by overriding the same variables, so utilities like

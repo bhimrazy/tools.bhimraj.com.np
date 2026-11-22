@@ -11,12 +11,12 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
 - **Low-end Android first.** Target a 2–3 GB phone: one job at a time, workers
   terminated when idle, decoded images kept under 16,777,216 px (iOS canvas cap),
   heavy code loaded only via dynamic `import()` when a tool needs it.
-- **Specs are the product.** Every preset in `packages/presets` cites a source and a
-  `verifiedAt` date, or is `null` and shown as unverified. Never invent a figure.
-- **Host-neutral.** The production host lives only in `packages/seo/src/origin.ts`
+- **Presets are the product.** Every preset in `packages/presets` cites a source and a
+  `verifiedAt` date, or is `null` and shown as not checked yet. Never invent a figure.
+- **Host-neutral.** The production host lives only in `packages/site/src/origin.ts`
   and `apps/web/wrangler.jsonc`; `bun run check:host` fails otherwise.
 - **Permissive dependencies only** (MIT/BSD/Apache/MPL) until the v2 licence decision;
-  no AGPL engines, no non-commercial models.
+  no AGPL libraries, no non-commercial models.
 
 ## Conventions
 
@@ -34,6 +34,26 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
   Preset `source` links are citations, not references, and stay.
 - Agent roles live in `.claude/agents/`; `/review-round` runs the CTO, CEO, security, product and SEO reviewers.
 
+## Naming
+
+- One word per idea; see the glossary below. Retired: "engine", "spec". In code, "fit" is only the crop mode
+  (`cover`/`contain`) and "fits" only means meeting the size rule. UI words come from the copy deck.
+- Glossary: form = the application (e.g. Lok Sewa online application) · upload = one file a form asks for ·
+  preset = sourced record for one upload · size rule (`SizeRule`) = its numbers · limit = `maxBytes` ·
+  attempt = one encode ("try" in UI) · job = one `compress()` call · `ImageWorker` = the main-thread handle ·
+  kit = a form's list of slots · slot = one upload in a kit.
+- Packages are named by capability (`@tools/image`, later `@tools/pdf`), not by layer.
+- Files: kebab-case modules named by job; PascalCase components; `x.test.ts` beside `x.ts`; browser tests
+  `*.e2e.ts`. No `utils`, `helpers`, `misc` or `common`.
+- Functions start with a verb (`get`, `read`, `format`, `to`, `compute`, `search`). `create*` returns an object
+  that owns resources and has `dispose()`; `open*` connects to persisted storage, is async and has `close()`.
+- Units in names: bytes are `*Bytes`, durations `*Ms`, memory `*MiB`. KB exists only at the input/display edge
+  (`KB = 1000`, `KIB = 1024`, `kbToMaxBytes`, `maxBytesToKb`).
+- Errors: `<Capability>Error` with a snake_case `code` naming the condition (`too_many_pixels`).
+- Routes: `/{verb}-{object}` for tools; `/forms/{cc}/{org}/{form}` for forms, one page per form with each upload a
+  `#{upload}` section. Build them with `formPath()`/`uploadPath()`; never store a URL in data.
+- No third-party product names in our identifiers.
+
 ## Validation
 
 Run before handing off; it is what CI runs:
@@ -43,4 +63,5 @@ bun run verify
 ```
 
 CI also runs the browser suite (`bun run build && bun run e2e`) after `check`; run it when you touch UI,
-engines or `_headers`. Specs live in `apps/web/e2e` and assert behaviour, not markup classes.
+`packages/image` or `_headers`. Browser tests (`*.e2e.ts`) live in `apps/web/e2e` and assert behaviour, not
+markup classes.

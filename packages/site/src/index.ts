@@ -37,7 +37,7 @@ export function siteOrigin(
   return url;
 }
 
-/** Absolute URL for a site path, e.g. "/np/lok-sewa-photo" -> "https://…/np/lok-sewa-photo". */
+/** Absolute URL for a site path, e.g. "/forms/np/psc/lok-sewa-application" -> "https://…/forms/np/psc/lok-sewa-application". */
 export function absoluteUrl(path: string, origin: URL = siteOrigin()): string {
   // Strip leading slashes and backslashes so "//x" or "/\\x" can't switch host.
   const url = new URL(`/${path.replace(/^[\\/]+/, "")}`, origin);

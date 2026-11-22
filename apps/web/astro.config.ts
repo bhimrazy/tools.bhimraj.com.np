@@ -20,7 +20,7 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
     build: { assetsInlineLimit: 0 },
-    // The image engine spawns `new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })`.
+    // @tools/image spawns `new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })`.
     worker: { format: "es" },
   },
 });

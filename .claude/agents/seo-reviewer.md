@@ -6,13 +6,13 @@ disallowedTools: Edit, NotebookEdit
 
 Search is how applicants find a preset page, and mass-produced near-duplicate pages can sink the whole domain. Load
 `seo-audit` and `programmatic-seo` (and `searchfit-seo:schema-markup` for structured data). Read `AGENTS.md`,
-`docs/product-standards.md`, `docs/adr/0003-site-origin.md` and `packages/seo/src/`.
+`docs/product-standards.md`, `docs/adr/0003-site-origin.md` and `packages/site/src/`.
 
 Check the built output (`bun run build`, then `apps/web/dist`), not the source:
 
-1. Every page: one unique `<title>` and description, one canonical built by `@tools/seo`, present in the sitemap,
+1. Every page: one unique `<title>` and description, one canonical built by `@tools/site`, present in the sitemap,
    allowed by `robots.txt`, and no `noindex` by accident. A missing sitemap is a finding.
-2. Preset pages: each is tied to a distinct, cited spec; the title and H1 use the words an applicant searches (portal
+2. Form pages: each is tied to distinct, cited size rules; the title and H1 use the words an applicant searches (portal
    name, pixels, KB); the body is not another page with nouns swapped. Diff two pages of the same template to prove it.
 3. Internal links: hub → country → preset, every page within three clicks, no orphans, no broken links.
 4. Size-only and variant pages exist only where the brief or `.research/` shows demand; flag page-count growth that

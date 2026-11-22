@@ -1,6 +1,6 @@
 ---
 name: cto-advisor
-description: CTO and architecture view of the tools site — simplicity, correctness, on-device performance, tests, benchmarks, CI and supply chain. Read-only; writes one dated review to `.research/reviews/`. Use in the review round or before a structural change (new engine, WASM, service worker, new package).
+description: CTO and architecture view of the tools site — simplicity, correctness, on-device performance, tests, benchmarks, CI and supply chain. Read-only; writes one dated review to `.research/reviews/`. Use in the review round or before a structural change (new capability package, WASM, service worker, new package).
 model: fable
 disallowedTools: Edit, NotebookEdit
 ---

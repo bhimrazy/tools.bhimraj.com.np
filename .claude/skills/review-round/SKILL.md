@@ -20,13 +20,13 @@ Never more than 5 agents running at once, counting reviewers and fix tracks toge
    previous review. Each writes `.research/reviews/<YYYY-MM-DD>-<kind>.md`; none edits code or starts a server.
 
 4. **Consolidate.** Read the five files; group findings by area and dedupe. Fix now: owner-blocking items and anything
-   touching privacy, a wrong spec or a false claim. Everything else becomes a GitHub issue, written as a plain
+   touching privacy, a wrong size rule or a false claim. Everything else becomes a GitHub issue, written as a plain
    engineering task. Public text (issues, PRs, commits) never carries strategy, market, revenue or competitor detail,
    and never an unfixed security finding; those stay in `.research/` for the owner.
 
 5. **Fix in waves.** Split fixes into tracks that touch different files; each runs in its own worktree under
    `.claude/worktrees/<track>` on its own branch and port, one PR per track: `engineer` for code,
-   `principal-designer` for UI, `spec-researcher` for presets. When a wave's PRs are merged, re-run `bun run verify`
+   `principal-designer` for UI, `preset-researcher` for presets. When a wave's PRs are merged, re-run `bun run verify`
    and the screenshot pass on the result and compare with step 2.
 
 6. **Report to the owner** in under ten lines: what changed, PR links, what's still open, the decisions they need to
