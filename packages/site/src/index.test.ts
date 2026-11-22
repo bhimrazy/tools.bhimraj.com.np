@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import {
   DEFAULT_SITE_ORIGIN,
+  NEW_ISSUE_URL,
   absoluteUrl,
-  alternates,
+  hreflangAlternates,
+  reportRuleUrl,
   siteOrigin,
 } from "./index";
 
@@ -38,12 +40,12 @@ test("absoluteUrl joins safely", () => {
   expect(absoluteUrl("", origin)).toBe("https://example.test/");
 });
 
-test("alternates includes x-default at the unprefixed path", () => {
+test("hreflangAlternates includes x-default at the unprefixed path", () => {
   const locales = [
     { hreflang: "en", prefix: "" },
     { hreflang: "ne", prefix: "/ne/" },
   ];
-  expect(alternates("/np/a", locales, origin)).toEqual([
+  expect(hreflangAlternates("/np/a", locales, origin)).toEqual([
     { hreflang: "en", href: "https://example.test/np/a" },
     { hreflang: "ne", href: "https://example.test/ne/np/a" },
     { hreflang: "x-default", href: "https://example.test/np/a" },
@@ -57,4 +59,13 @@ test("absoluteUrl never leaves the site origin", () => {
   expect(absoluteUrl("/\\evil.example/x", origin)).toBe(
     "https://example.test/evil.example/x",
   );
+});
+
+test("reportRuleUrl prefills a size rule issue", () => {
+  const url = new URL(reportRuleUrl("Lok Sewa photo", "/forms/np/psc/x"));
+  expect(url.href.startsWith(NEW_ISSUE_URL)).toBe(true);
+  expect(url.searchParams.get("title")).toBe(
+    "Size rule changed: Lok Sewa photo",
+  );
+  expect(url.searchParams.get("body")).toStartWith("Page: /forms/np/psc/x\n");
 });

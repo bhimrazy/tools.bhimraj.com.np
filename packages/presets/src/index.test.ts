@@ -1,12 +1,20 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { kbMax, kbMin } from "./bytes";
 import {
+  kbToMaxBytes,
+  kbToMinBytes,
+  maxBytesToKb,
+  minBytesToKb,
+} from "./bytes";
+import {
+  formPath,
   getPreset,
-  presetsByCountry,
-  presetToCompressOptions,
+  groupByCountry,
+  groupByForm,
   presets,
+  toCompressOptions,
+  uploadPath,
 } from "./index";
 import { presetSchema, validatePresets } from "./schema";
 
@@ -15,20 +23,25 @@ test("presets are non-empty and schema-valid", () => {
   for (const p of presets) expect(presetSchema.safeParse(p).success).toBe(true);
 });
 
-test("ids and paths are unique", () => {
+test("ids and upload paths are unique", () => {
   expect(new Set(presets.map((p) => p.id)).size).toBe(presets.length);
-  expect(new Set(presets.map((p) => p.path)).size).toBe(presets.length);
+  expect(new Set(presets.map(uploadPath)).size).toBe(presets.length);
 });
 
-test("path format and country prefix", () => {
-  for (const p of presets) {
-    expect(p.path).toMatch(/^[a-z]{2}\/[a-z0-9-]+$/);
-    expect(p.path.slice(0, 2)).toBe(p.country.toLowerCase());
-  }
+test("form URLs are built from the slugs", () => {
+  const p = getPreset("np-psc-lok-sewa-application-photo");
+  if (!p) throw new Error("missing preset");
+  expect(formPath(p)).toBe("/forms/np/psc/lok-sewa-application");
+  expect(uploadPath(p)).toBe("/forms/np/psc/lok-sewa-application#photo");
+  expect(
+    groupByForm()
+      .get(formPath(p))
+      ?.map((x) => x.upload),
+  ).toEqual(["photo", "signature"]);
 });
 
 test("byte and dimension sanity", () => {
-  for (const { output: o } of presets) {
+  for (const { rule: o } of presets) {
     if (o.minBytes !== undefined) expect(o.minBytes).toBeLessThan(o.maxBytes);
     for (const d of [o.width, o.height])
       if (d !== undefined) expect(Number.isInteger(d) && d > 0).toBe(true);
@@ -51,7 +64,8 @@ test("verifiedAt is a real date or null; verified entries have an https source",
 
 test("schema rejects bad data", () => {
   const base = structuredClone(presets[0]);
-  expect(presetSchema.safeParse({ ...base, path: "xx/foo" }).success).toBe(
+  expect(presetSchema.safeParse({ ...base, org: "other" }).success).toBe(false);
+  expect(presetSchema.safeParse({ ...base, upload: "Photo" }).success).toBe(
     false,
   );
   expect(
@@ -66,26 +80,37 @@ test("schema rejects bad data", () => {
   expect(
     presetSchema.safeParse({
       ...base,
-      output: { ...base?.output, minBytes: 9e9 },
+      rule: { ...base?.rule, minBytes: 9e9 },
     }).success,
   ).toBe(false);
 });
 
-test("getPreset and presetsByCountry", () => {
-  expect(getPreset("us-dv-lottery-photo")?.country).toBe("US");
+test("getPreset and groupByCountry", () => {
+  expect(getPreset("us-state-dept-dv-lottery-entry-photo")?.country).toBe("US");
   expect(getPreset("nope")).toBeUndefined();
-  expect(presetsByCountry().get("NP")?.length).toBe(2);
+  expect(groupByCountry().get("NP")?.length).toBe(2);
 });
 
 test("data passes the zod schema", () => {
   expect(validatePresets(presets)).toHaveLength(presets.length);
 });
 
+test("uploads on one form page agree on its title", () => {
+  const [a, b] = presets;
+  if (!a || !b) throw new Error("need two presets");
+  const extra = { ...a, id: `${a.id}-x`, upload: `${a.upload}-x` };
+  expect(() => validatePresets([a, extra])).not.toThrow();
+  expect(() => validatePresets([a, { ...extra, formTitle: "Other" }])).toThrow(
+    /mixed formTitle/,
+  );
+  expect(() => validatePresets([b, b])).toThrow(/duplicate/);
+});
+
 test("signatures contain, photos cover", () => {
   for (const p of presets)
-    expect(p.output.fit).toBe(p.kind === "photo" ? "cover" : "contain");
+    expect(p.rule.fit).toBe(p.kind === "photo" ? "cover" : "contain");
   const sig = structuredClone(presets.find((p) => p.kind === "signature"));
-  if (sig) sig.output.fit = "cover";
+  if (sig) sig.rule.fit = "cover";
   expect(presetSchema.safeParse(sig).success).toBe(false);
 });
 
@@ -94,33 +119,40 @@ test("schema rejects png output", () => {
   expect(
     presetSchema.safeParse({
       ...base,
-      output: { ...base?.output, format: "image/png" },
+      rule: { ...base?.rule, format: "image/png" },
     }).success,
   ).toBe(false);
 });
 
 test("byte limits keep headroom", () => {
-  expect(kbMax(200)).toBe(198_000);
-  expect(kbMax(200)).toBeLessThan(200_000);
-  expect(kbMin(10)).toBeGreaterThan(10 * 1024);
-  expect(kbMin(10)).toBe(10_343);
+  expect(kbToMaxBytes(200)).toBe(198_000);
+  expect(kbToMaxBytes(200)).toBeLessThan(200_000);
+  expect(kbToMinBytes(10)).toBeGreaterThan(10 * 1024);
+  expect(kbToMinBytes(10)).toBe(10_343);
 });
 
-test("presetToCompressOptions maps output and omits unset keys", () => {
-  const p = getPreset("np-lok-sewa-signature");
+test("bytes convert back to the stated KB", () => {
+  expect(maxBytesToKb(kbToMaxBytes(200))).toBe(200);
+  expect(minBytesToKb(kbToMinBytes(10))).toBe(10);
+  expect(maxBytesToKb(kbToMaxBytes(12.5))).toBe(12.5);
+});
+
+test("toCompressOptions copies the rule and omits unset keys", () => {
+  const p = getPreset("np-psc-lok-sewa-application-signature");
   if (!p) throw new Error("missing preset");
-  expect(presetToCompressOptions(p)).toEqual({
-    maxBytes: kbMax(100),
-    minBytes: kbMin(5),
+  expect(toCompressOptions(p.rule)).toEqual({
+    maxBytes: kbToMaxBytes(100),
+    minBytes: kbToMinBytes(5),
     width: 300,
     height: 80,
     fit: "contain",
     format: "image/jpeg",
     background: "#ffffff",
   });
-  const bare = presetToCompressOptions({
-    ...p,
-    output: { format: "image/webp", fit: "cover", maxBytes: 5 },
+  const bare = toCompressOptions({
+    format: "image/webp",
+    fit: "cover",
+    maxBytes: 5,
   });
   expect(bare).toEqual({ maxBytes: 5, fit: "cover", format: "image/webp" });
 });

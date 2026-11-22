@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { watchPage } from "./helpers";
+import { watchPage } from "./page";
 
 const pages = [
   { path: "/", title: /^Tools: form-ready photos/, canonical: "/" },
@@ -9,9 +9,9 @@ const pages = [
     canonical: "/compress-image",
   },
   {
-    path: "/np/lok-sewa-photo",
-    title: /^Lok Sewa Aayog online application photo/,
-    canonical: "/np/lok-sewa-photo",
+    path: "/forms/np/psc/lok-sewa-application",
+    title: /^Lok Sewa Aayog online application · Tools/,
+    canonical: "/forms/np/psc/lok-sewa-application",
   },
 ];
 
@@ -34,7 +34,7 @@ for (const p of pages) {
 test("tool pages show the upload control", async ({ page }) => {
   await page.goto("/compress-image");
   await expect(page.getByLabel(/^Choose/)).toBeAttached();
-  await expect(page.getByLabel("Max size (KB)")).toHaveValue("100");
+  await expect(page.getByLabel("Largest size (KB)")).toHaveValue("100");
 });
 
 test("unknown path serves the 404 page", async ({ page }) => {

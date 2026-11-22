@@ -9,5 +9,5 @@ linker = "isolated"
 # semi = false
 
 [test]
-# Playwright specs run via `bun run e2e`.
+# Playwright tests (*.e2e.ts) run via `bun run e2e`.
 pathIgnorePatterns = ["**/e2e/**"]

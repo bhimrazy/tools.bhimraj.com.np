@@ -1,8 +1,8 @@
-import { createImageEngine } from "@tools/engines/image";
-// Not exported by the package: called directly so CPU throttling (main thread only) applies.
-import { compressImage } from "../../packages/engines/src/image/canvas";
+import { createImageWorker } from "@tools/image";
+// Called directly, not through the worker, so CPU throttling (main thread only) applies.
+import { compressImage } from "@tools/image/compress";
 import { presets } from "@tools/presets";
-import { inputs, jobs, type InputSpec, type JobSpec } from "./cases";
+import { inputs, jobs, type BenchInput, type BenchJob } from "./cases";
 
 export interface JobResult {
   input: string;
@@ -11,7 +11,7 @@ export interface JobResult {
   wallMs: number;
   outBytes: number;
   maxBytes: number;
-  withinTarget: boolean;
+  fitsBytes: boolean;
   width: number;
   height: number;
   quality: number;
@@ -21,8 +21,8 @@ const blobs = new Map<string, Blob>();
 let seed = 1;
 const rand = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 
-async function generate(spec: InputSpec): Promise<Blob> {
-  const { width, height, kind } = spec;
+async function generate(input: BenchInput): Promise<Blob> {
+  const { width, height, kind } = input;
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext("2d")!;
   if (kind === "photo") {
@@ -84,14 +84,14 @@ const api = {
   inputs,
   jobs,
   async prepare(): Promise<void> {
-    for (const spec of inputs) blobs.set(spec.id, await generate(spec));
+    for (const input of inputs) blobs.set(input.id, await generate(input));
   },
-  async run(job: JobSpec, where: "worker" | "main"): Promise<JobResult> {
+  async run(job: BenchJob, where: "worker" | "main"): Promise<JobResult> {
     const file = blobs.get(job.input)!;
-    // Fresh engine per job: cold worker start is part of what a phone pays.
-    const engine = where === "worker" ? createImageEngine() : undefined;
+    // Fresh image worker per job: cold worker start is part of what a phone pays.
+    const image = where === "worker" ? createImageWorker() : undefined;
     const run = (file: Blob, o: Parameters<typeof compressImage>[1]) =>
-      engine ? engine.compress(file, o) : compressImage(file, o);
+      image ? image.compress(file, o) : compressImage(file, o);
     const start = performance.now();
     try {
       const r = await run(file, {
@@ -109,27 +109,27 @@ const api = {
         wallMs,
         outBytes: r.bytes,
         maxBytes: job.maxBytes,
-        withinTarget: r.withinTarget,
+        fitsBytes: r.fitsBytes,
         width: r.width,
         height: r.height,
         quality: Math.round(r.quality * 100) / 100,
       };
     } finally {
-      engine?.dispose();
+      image?.dispose();
     }
   },
 };
 
 /** Lok Sewa photo and signature presets, run on the matching generated inputs. */
-export function presetJobs(): JobSpec[] {
-  const out: JobSpec[] = [];
+export function presetJobs(): BenchJob[] {
+  const out: BenchJob[] = [];
   for (const [id, input] of [
-    ["np-lok-sewa-photo", "photo-12mp"],
-    ["np-lok-sewa-signature", "signature-2000x600"],
+    ["np-psc-lok-sewa-application-photo", "photo-12mp"],
+    ["np-psc-lok-sewa-application-signature", "signature-2000x600"],
   ] as const) {
     const p = presets.find((x) => x.id === id);
-    if (!p) continue;
-    const o = p.output;
+    if (!p) throw new Error(`bench preset missing: ${id}`);
+    const o = p.rule;
     out.push({
       input,
       label: `${id} ${o.width}x${o.height}`,

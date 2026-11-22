@@ -1,20 +1,23 @@
 import type { Preset } from "../index";
-import { kbMax } from "../bytes";
+import { kbToMaxBytes } from "../bytes";
 
 export const us: Preset[] = [
   {
-    id: "us-dv-lottery-photo",
-    path: "us/dv-lottery-photo",
+    id: "us-state-dept-dv-lottery-entry-photo",
     country: "US",
     portal: "Diversity Visa Program (dvprogram.state.gov)",
+    org: "state-dept",
+    form: "dv-lottery-entry",
+    formTitle: "US DV Lottery entry",
+    upload: "photo",
     title: "US DV Lottery entry photo",
     kind: "photo",
-    output: {
+    rule: {
       format: "image/jpeg",
       fit: "cover",
       width: 600,
       height: 600,
-      maxBytes: kbMax(240),
+      maxBytes: kbToMaxBytes(240),
       background: "#ffffff",
     },
     source: {

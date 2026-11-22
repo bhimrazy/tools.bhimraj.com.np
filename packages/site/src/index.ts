@@ -1,6 +1,7 @@
 import { DEFAULT_SITE_ORIGIN } from "./origin";
 
 export { DEFAULT_SITE_ORIGIN } from "./origin";
+export { NEW_ISSUE_URL, REPO_URL, reportRuleUrl } from "./links";
 
 export interface Alternate {
   hreflang: string;
@@ -36,7 +37,7 @@ export function siteOrigin(
   return url;
 }
 
-/** Absolute URL for a site path, e.g. "/np/lok-sewa-photo" -> "https://…/np/lok-sewa-photo". */
+/** Absolute URL for a site path, e.g. "/forms/np/psc/lok-sewa-application" -> "https://…/forms/np/psc/lok-sewa-application". */
 export function absoluteUrl(path: string, origin: URL = siteOrigin()): string {
   // Strip leading slashes and backslashes so "//x" or "/\\x" can't switch host.
   const url = new URL(`/${path.replace(/^[\\/]+/, "")}`, origin);
@@ -46,7 +47,7 @@ export function absoluteUrl(path: string, origin: URL = siteOrigin()): string {
 }
 
 /** hreflang alternates for a path; `x-default` is the unprefixed path. */
-export function alternates(
+export function hreflangAlternates(
   path: string,
   locales: readonly { hreflang: string; prefix: string }[],
   origin: URL = siteOrigin(),

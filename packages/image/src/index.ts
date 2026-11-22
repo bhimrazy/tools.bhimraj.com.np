@@ -1,11 +1,11 @@
-import { EngineError, errorCode } from "./errors";
+import { ImageError, toErrorCode } from "./errors";
 import type {
   CancelRequest,
   CompressRequest,
   WorkerResponse,
 } from "./protocol";
 
-export { EngineError, type ErrorCode } from "./errors";
+export { ImageError, type ImageErrorCode } from "./errors";
 
 export type OutputFormat = "image/jpeg" | "image/webp";
 
@@ -30,11 +30,11 @@ export interface CompressResult {
   quality: number;
   format: OutputFormat;
   /** false when the output is outside [minBytes, maxBytes] even at the smallest size tried */
-  withinTarget: boolean;
+  fitsBytes: boolean;
 }
 
-export interface ImageEngine {
-  /** Rejects with an `EngineError` (switch on `code`), or the signal's reason when aborted. */
+export interface ImageWorker {
+  /** Rejects with an `ImageError` (switch on `code`), or the signal's reason when aborted. */
   compress(
     file: Blob,
     opts: CompressOptions,
@@ -44,9 +44,9 @@ export interface ImageEngine {
   dispose(): void;
 }
 
-export interface EngineOptions {
+export interface ImageWorkerOptions {
   /** Worker factory (tests pass a fake). Default: the bundled worker, or the main thread without OffscreenCanvas. */
-  createWorker?: () => Worker;
+  spawnWorker?: () => Worker;
   /** A worker job running longer than this is presumed hung: the worker is killed and the job fails with "timeout". */
   timeoutMs?: number;
   /** How long a cancelled job's worker gets to stop before it's killed. */
@@ -70,11 +70,11 @@ interface Job {
 const bundledWorker = () =>
   new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
 
-const toEngineError = (err: unknown) =>
-  err instanceof EngineError
+const toImageError = (err: unknown) =>
+  err instanceof ImageError
     ? err
-    : new EngineError(
-        errorCode(err),
+    : new ImageError(
+        toErrorCode(err),
         err instanceof Error ? err.message : String(err),
         { cause: err },
       );
@@ -84,14 +84,16 @@ const toEngineError = (err: unknown) =>
  * peak memory low on 2–3 GB phones. Falls back to the main thread where workers
  * can't draw (iOS < 16.4).
  */
-export function createImageEngine(options: EngineOptions = {}): ImageEngine {
+export function createImageWorker(
+  options: ImageWorkerOptions = {},
+): ImageWorker {
   const { timeoutMs = TIMEOUT_MS, cancelGraceMs = CANCEL_GRACE_MS } = options;
-  const createWorker =
-    options.createWorker ??
+  const spawnWorker =
+    options.spawnWorker ??
     (typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined"
       ? bundledWorker
       : undefined);
-  let mainThread = !createWorker;
+  let mainThread = !spawnWorker;
   let worker: Worker | undefined;
   let idle: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
@@ -115,19 +117,19 @@ export function createImageEngine(options: EngineOptions = {}): ImageEngine {
     next();
   };
 
-  const kill = (err: EngineError) => {
+  const kill = (err: ImageError) => {
     const job = running;
     stop();
     if (job) finish(job, (j) => j.reject(err));
   };
 
-  const arm = (ms: number, err: () => EngineError) => {
+  const arm = (ms: number, err: () => ImageError) => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => kill(err()), ms);
   };
 
   const spawn = () => {
-    const w = createWorker!();
+    const w = spawnWorker!();
     w.onmessage = ({ data: msg }: MessageEvent<WorkerResponse>) => {
       const job = running;
       if (msg.id !== job?.id) return;
@@ -140,27 +142,27 @@ export function createImageEngine(options: EngineOptions = {}): ImageEngine {
         queue.unshift(job);
         return next();
       }
-      finish(job, (j) => j.reject(new EngineError(msg.code, msg.error)));
+      finish(job, (j) => j.reject(new ImageError(msg.code, msg.message)));
     };
     w.onerror = (e) => {
       e.preventDefault();
-      kill(new EngineError("internal", e.message || "Image worker failed"));
+      kill(new ImageError("internal", e.message || "Image worker failed"));
     };
     w.onmessageerror = () =>
       kill(
-        new EngineError("internal", "Image worker sent an unreadable message"),
+        new ImageError("internal", "Image worker sent an unreadable message"),
       );
     return w;
   };
 
   const runOnMain = (job: Job) => {
-    import("./canvas")
+    import("./compress")
       .then(({ compressImage }) =>
         compressImage(job.file, job.opts, job.ctrl.signal),
       )
       .then(
         (result) => finish(job, (j) => j.resolve(result)),
-        (err) => finish(job, (j) => j.reject(toEngineError(err))),
+        (err) => finish(job, (j) => j.reject(toImageError(err))),
       );
   };
 
@@ -177,12 +179,12 @@ export function createImageEngine(options: EngineOptions = {}): ImageEngine {
     worker ??= spawn();
     arm(
       timeoutMs,
-      () => new EngineError("timeout", "Image processing took too long"),
+      () => new ImageError("timeout", "Image processing took too long"),
     );
     worker.postMessage({
       id: job.id,
       file: job.file,
-      opts: job.opts,
+      options: job.opts,
     } satisfies CompressRequest);
   }
 
@@ -202,7 +204,7 @@ export function createImageEngine(options: EngineOptions = {}): ImageEngine {
             } satisfies CancelRequest);
             arm(
               cancelGraceMs,
-              () => new EngineError("timeout", "Image worker didn't stop"),
+              () => new ImageError("timeout", "Image worker didn't stop"),
             );
           }
           reject(signal?.reason);
@@ -228,7 +230,7 @@ export function createImageEngine(options: EngineOptions = {}): ImageEngine {
     },
     dispose() {
       stop();
-      const err = new EngineError("aborted", "Image engine disposed");
+      const err = new ImageError("aborted", "Image worker disposed");
       const jobs = running ? [running, ...queue.splice(0)] : queue.splice(0);
       running = undefined;
       for (const job of jobs) {

@@ -21,7 +21,7 @@ Rules:
 - Design for a 360px phone first, then 1440. Keyboard access, visible focus, WCAG AA contrast in both themes, 44px tap
   targets, no horizontal overflow.
 - Copy is plain English a non-native reader follows; figures (px, KB) in the monospace face.
-- Every state is designed: empty, dragging, working, done (pass and fail against the spec), error.
+- Every state is designed: empty, dragging, working, done (pass and fail against the size rule), error.
 
 Capture before/after at 1440 and 360, light and dark, with the chrome-devtools MCP (emulate viewport and colour scheme)
 into a scratch directory; attach the ones that matter to the PR, never commit them.

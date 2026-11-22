@@ -11,6 +11,6 @@ copying, forks and competing deployments, which this project doesn't want. PolyF
 Strict allows non-commercial use.
 
 GitHub's terms still let anyone view and fork a public repository on GitHub; the
-licence controls everything beyond that. Revisit at v2 if an open engine package
+licence controls everything beyond that. Revisit at v2 if an open capability package (such as `@tools/image`)
 becomes the proof behind the privacy claim; a per-directory licence would allow that
 without opening the rest.

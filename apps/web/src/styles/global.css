@@ -205,21 +205,21 @@
     border-color: var(--color-border-strong);
   }
 
-  /* Key/value rows for specs and results. */
-  .kv > div {
+  /* Key/value rows for size rules and results. */
+  .facts > div {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--color-border);
   }
-  .kv > div:last-child {
+  .facts > div:last-child {
     border-bottom: 0;
   }
-  .kv dt {
+  .facts dt {
     color: var(--color-muted);
   }
-  .kv dd {
+  .facts dd {
     font-family: var(--font-mono);
     text-align: right;
   }

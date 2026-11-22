@@ -1,6 +1,6 @@
 import preact from "@astrojs/preact";
 import tailwindcss from "@tailwindcss/vite";
-import { siteOrigin } from "@tools/seo";
+import { siteOrigin } from "@tools/site";
 import { defineConfig } from "astro/config";
 
 // CSP: public/_headers ships `script-src 'self'; style-src 'self'` with no hashes.
@@ -20,7 +20,7 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
     build: { assetsInlineLimit: 0 },
-    // The image engine spawns `new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })`.
+    // @tools/image spawns `new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })`.
     worker: { format: "es" },
   },
 });

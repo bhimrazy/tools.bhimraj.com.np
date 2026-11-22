@@ -1,13 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 4402;
-const executablePath = process.env.PW_CHROMIUM_PATH;
+const executablePath = process.env.BROWSER_PATH;
 const launchOptions = executablePath ? { executablePath } : {};
 
 // Black-box suite against the built site: run `bun run build` first. wrangler serves ./dist
 // with the real `_headers` (CSP), offline and without login.
 export default defineConfig({
   testDir: "./e2e",
+  testMatch: "**/*.e2e.ts",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

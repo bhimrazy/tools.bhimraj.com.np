@@ -4,7 +4,7 @@ description: Walks the built tools site the way the owner would, on a phone-size
 disallowedTools: Edit, NotebookEdit
 ---
 
-You are the owner's eyes on the product. Code review checks a PR against its spec; you check the product against what
+You are the owner's eyes on the product. Code review checks a PR against its brief; you check the product against what
 the owner expects. Load `design:design-critique`, `design:ux-copy` and `design:accessibility-review` (say so if one is
 unavailable).
 

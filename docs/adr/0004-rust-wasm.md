@@ -15,4 +15,4 @@ When a Rust crate is justified:
   a `build:wasm` script run with `bun run --filter`.
 - Single-threaded by default: threads need cross-origin isolation, which blocks most
   ad scripts and adds little on phones.
-- Loaded by dynamic `import()` inside the engine's worker, never on page load.
+- Loaded by dynamic `import()` inside the capability package's worker, never on page load.
