@@ -61,10 +61,15 @@ deploy more. It then:
 To deploy by hand, go to Actions → **Vercel Production** → Run workflow on `main`. A manual run
 deploys `main`'s head once CI has passed on it.
 
-Every deploy builds with `vercel build` before any token is set, then uploads the output as a
-single archive (`vercel deploy --prebuilt --archive=tgz`). The Vercel CLI version is pinned in
-`.github/vercel-cli/package.json`, with its own frozen lockfile and the 7-day cooldown. Dependabot
-bumps it.
+Each deploy runs as two jobs. `build` runs repository code (install, `vercel build`) and gets the
+token only for `vercel pull`, which runs before any of that code. It uploads `.vercel/output` as an
+artifact. `deploy` holds the token but checks out only `.github/vercel-cli`, so it runs nothing
+but the pinned CLI: `vercel deploy --prebuilt --archive=tgz`. The Vercel CLI version is pinned in
+`.github/vercel-cli/package.json`, with its own frozen lockfile and the 7-day cooldown, and
+Dependabot bumps it. CI audits that lockfile at `critical`, because the CLI's exact-pinned
+dependencies carry known high-severity DoS advisories that no release past the cooldown fixes yet.
+An override pins `tar` to a patched 7.5 release. Production also skips a commit that doesn't
+descend from the live one, so re-running an old CI run can't roll production back.
 
 **Rollback:** in Vercel → Deployments, promote the previous production deployment. The next
 automatic deploy compares against the newest ready production deployment, so it still ships every

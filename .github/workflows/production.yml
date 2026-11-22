@@ -16,26 +16,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  gate:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 5
     # Main-only (branch policy), so PR runs never see this token.
     environment: vercel-production
     permissions:
       contents: read
       actions: read
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
     env:
-      # The commit CI tested, not whatever main points at now.
       SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-      VERCEL: ${{ github.workspace }}/.github/vercel-cli/node_modules/.bin/vercel
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,6 +68,9 @@ jobs:
           [ "$last" != none ] || deploy "No production deploy from this workflow yet."
           git cat-file -e "$last^{commit}" 2>/dev/null ||
             skip "the last production deploy's commit (${last:0:7}) isn't in this checkout."
+          # A re-run of an old CI run must not roll production back.
+          git merge-base --is-ancestor "$last" "$SHA" ||
+            skip "${SHA:0:7} is older than live (${last:0:7})."
           # grep exits 1 when nothing is left; that means nothing ships.
           shipped=$(git diff --name-only "$last" "$SHA" |
             grep -vE '^(docs|bench|scripts|\.github|\.claude|\.githooks|apps/web/e2e)/|\.md$|\.test\.ts$' || true)
@@ -76,19 +78,73 @@ jobs:
           [ -n "$shipped" ] || skip "nothing that ships changed since ${last:0:7}."
           deploy "Deploying ${SHA:0:7} (last production: ${last:0:7})."
 
-      - if: steps.gate.outputs.deploy == 'true'
-        uses: ./.github/actions/setup
-      - if: steps.gate.outputs.deploy == 'true'
-        run: bun install --frozen-lockfile --cwd .github/vercel-cli
-      - if: steps.gate.outputs.deploy == 'true'
-        run: '"$VERCEL" pull --yes --environment=production'
+  # Runs repository code, so the token only reaches `vercel pull`, which runs before any of it.
+  build:
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    environment: vercel-production
+    permissions:
+      contents: read
+    env:
+      VERCEL: ${{ github.workspace }}/.github/vercel-cli/node_modules/.bin/vercel
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The commit CI tested, not whatever main points at now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile --cwd .github/vercel-cli
+      - run: '"$VERCEL" pull --yes --environment=production'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      # No token here: the build runs repository code.
-      - if: steps.gate.outputs.deploy == 'true'
-        run: '"$VERCEL" build --prod'
-      # The meta is what the gate above reads on the next run.
-      - if: steps.gate.outputs.deploy == 'true'
-        env:
+      - run: bun install --frozen-lockfile
+      - run: '"$VERCEL" build --prod'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vercel-build
+          path: |
+            .vercel/project.json
+            .vercel/output/
+          include-hidden-files: true
+          retention-days: 1
+
+  # Holds the token and runs no repository code: only the pinned CLI on the built output.
+  deploy:
+    needs: build
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment: vercel-production
+    permissions:
+      contents: read
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      VERCEL: ${{ github.workspace }}/.github/vercel-cli/node_modules/.bin/vercel
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SHA }}
+          sparse-checkout: .github/vercel-cli
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile --cwd .github/vercel-cli
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: vercel-build
+          path: .vercel
+      # The meta is what the gate reads on the next run.
+      - env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: '"$VERCEL" deploy --prebuilt --prod --archive=tgz --meta githubCommitSha="$SHA"'
