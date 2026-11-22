@@ -82,7 +82,7 @@ export function scaleLayout(
 }
 
 /** iOS Safari refuses canvases larger than this many pixels. */
-export const MAX_PIXELS = 16_777_216;
+export const MAX_CANVAS_PIXELS = 16_777_216;
 /** Decode budget on phones reporting ≤ 4 GB: an RGBA copy of this is 32 MB. */
 export const LOW_MEMORY_PIXELS = 8_388_608;
 
@@ -90,7 +90,7 @@ export const LOW_MEMORY_PIXELS = 8_388_608;
 export function pixelBudget(deviceMemory?: number): number {
   return deviceMemory !== undefined && deviceMemory <= 4
     ? LOW_MEMORY_PIXELS
-    : MAX_PIXELS;
+    : MAX_CANVAS_PIXELS;
 }
 
 /** Same aspect, area ≤ maxPixels. Floors, since rounding up can overshoot the cap. */

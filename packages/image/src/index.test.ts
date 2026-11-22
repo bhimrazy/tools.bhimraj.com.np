@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createImageEngine, EngineError, type CompressResult } from "./index";
+import { createImageWorker, ImageError, type CompressResult } from "./index";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 
 const file = new Blob([new Uint8Array(8)], { type: "image/jpeg" });
@@ -29,64 +29,64 @@ class FakeWorker {
   }
 }
 
-function fakeEngine(
+function fakeImageWorker(
   respond?: (msg: WorkerRequest) => WorkerResponse | undefined,
   timing = {},
 ) {
   const workers: FakeWorker[] = [];
-  const engine = createImageEngine({
-    createWorker: () => {
+  const image = createImageWorker({
+    spawnWorker: () => {
       const w = new FakeWorker(respond);
       workers.push(w);
       return w as unknown as Worker;
     },
     ...timing,
   });
-  return { engine, workers };
+  return { image, workers };
 }
 
 const settle = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
 describe("error codes", () => {
   test("without OffscreenCanvas (as in Bun) it runs on the main thread and reports unsupported_browser", async () => {
-    const engine = createImageEngine();
-    const runs = [engine.compress(file, opts), engine.compress(file, opts)];
+    const image = createImageWorker();
+    const runs = [image.compress(file, opts), image.compress(file, opts)];
     for (const r of await Promise.allSettled(runs))
       expect(r).toMatchObject({ reason: { code: "unsupported_browser" } });
   });
 
   test("a real worker that can't draw hands the job to the main thread", async () => {
-    const engine = createImageEngine({
-      createWorker: () =>
+    const image = createImageWorker({
+      spawnWorker: () =>
         new Worker(new URL("./worker.ts", import.meta.url), { type: "module" }),
     });
     try {
-      const err = await engine.compress(file, opts).catch((e: unknown) => e);
-      expect(err).toBeInstanceOf(EngineError);
+      const err = await image.compress(file, opts).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ImageError);
       expect(err).toMatchObject({ code: "unsupported_browser" });
     } finally {
-      engine.dispose();
+      image.dispose();
     }
   });
 
-  test("the worker's code survives the boundary", async () => {
-    const { engine } = fakeEngine((msg) =>
+  test("the worker's error code survives the boundary", async () => {
+    const { image } = fakeImageWorker((msg) =>
       "cancel" in msg
         ? undefined
-        : { id: msg.id, ok: false, code: "decode_failed", error: "bad file" },
+        : { id: msg.id, ok: false, code: "decode_failed", message: "bad file" },
     );
-    const err = await engine.compress(file, opts).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(EngineError);
+    const err = await image.compress(file, opts).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ImageError);
     expect(err).toMatchObject({ code: "decode_failed", message: "bad file" });
   });
 
   test("unsupported_browser from the worker switches later jobs to the main thread", async () => {
-    const { engine, workers } = fakeEngine((msg) =>
+    const { image, workers } = fakeImageWorker((msg) =>
       "cancel" in msg
         ? undefined
-        : { id: msg.id, ok: false, code: "unsupported_browser", error: "" },
+        : { id: msg.id, ok: false, code: "unsupported_browser", message: "" },
     );
-    const runs = [engine.compress(file, opts), engine.compress(file, opts)];
+    const runs = [image.compress(file, opts), image.compress(file, opts)];
     for (const r of await Promise.allSettled(runs))
       expect(r).toMatchObject({ reason: { code: "unsupported_browser" } });
     expect(workers).toHaveLength(1);
@@ -98,7 +98,7 @@ describe("error codes", () => {
 describe("watchdog", () => {
   test("a silent worker is killed, the job fails with timeout, and the queue moves on", async () => {
     let first = true;
-    const { engine, workers } = fakeEngine(
+    const { image, workers } = fakeImageWorker(
       (msg) => {
         if ("cancel" in msg) return undefined;
         if (first) return void (first = false);
@@ -106,17 +106,17 @@ describe("watchdog", () => {
       },
       { timeoutMs: 20 },
     );
-    const hung = engine.compress(file, opts);
-    const queued = engine.compress(file, opts);
+    const hung = image.compress(file, opts);
+    const queued = image.compress(file, opts);
     await expect(hung).rejects.toMatchObject({ code: "timeout" });
     expect(await queued).toBe(result);
     expect(workers).toHaveLength(2);
     expect(workers[0]!.terminated).toBe(true);
-    engine.dispose();
+    image.dispose();
   });
 
   test("a worker that ignores cancel is killed after the grace period", async () => {
-    const { engine, workers } = fakeEngine(
+    const { image, workers } = fakeImageWorker(
       (msg) =>
         "cancel" in msg || msg.id === 1
           ? undefined
@@ -124,8 +124,8 @@ describe("watchdog", () => {
       { timeoutMs: 60_000, cancelGraceMs: 20 },
     );
     const ctrl = new AbortController();
-    const cancelled = engine.compress(file, opts, ctrl.signal);
-    const queued = engine.compress(file, opts);
+    const cancelled = image.compress(file, opts, ctrl.signal);
+    const queued = image.compress(file, opts);
     ctrl.abort();
     await expect(cancelled).rejects.toMatchObject({ name: "AbortError" });
     await settle(5);
@@ -134,23 +134,23 @@ describe("watchdog", () => {
     expect(await queued).toBe(result);
     expect(workers[0]!.terminated).toBe(true);
     expect(workers[1]!.posted.map((m) => m.id)).toEqual([2]);
-    engine.dispose();
+    image.dispose();
   });
 });
 
 test("abort and dispose reject with AbortError", async () => {
-  const { engine } = fakeEngine();
-  expect(
-    engine.compress(file, opts, AbortSignal.abort()),
-  ).rejects.toMatchObject({ name: "AbortError" });
+  const { image } = fakeImageWorker();
+  expect(image.compress(file, opts, AbortSignal.abort())).rejects.toMatchObject(
+    { name: "AbortError" },
+  );
 
   const ctrl = new AbortController();
-  const running = engine.compress(file, opts);
-  const queued = engine.compress(file, opts, ctrl.signal);
-  const pending = engine.compress(file, opts);
+  const running = image.compress(file, opts);
+  const queued = image.compress(file, opts, ctrl.signal);
+  const pending = image.compress(file, opts);
   ctrl.abort();
   expect(queued).rejects.toMatchObject({ name: "AbortError" });
-  engine.dispose();
+  image.dispose();
   expect(running).rejects.toMatchObject({
     name: "AbortError",
     code: "aborted",

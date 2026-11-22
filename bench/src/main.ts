@@ -1,4 +1,4 @@
-import { createImageEngine } from "@tools/image";
+import { createImageWorker } from "@tools/image";
 // Not exported by the package: called directly so CPU throttling (main thread only) applies.
 import { compressImage } from "@tools/image/compress";
 import { presets } from "@tools/presets";
@@ -89,7 +89,7 @@ const api = {
   async run(job: JobSpec, where: "worker" | "main"): Promise<JobResult> {
     const file = blobs.get(job.input)!;
     // Fresh engine per job: cold worker start is part of what a phone pays.
-    const engine = where === "worker" ? createImageEngine() : undefined;
+    const engine = where === "worker" ? createImageWorker() : undefined;
     const run = (file: Blob, o: Parameters<typeof compressImage>[1]) =>
       engine ? engine.compress(file, o) : compressImage(file, o);
     const start = performance.now();
@@ -109,7 +109,7 @@ const api = {
         wallMs,
         outBytes: r.bytes,
         maxBytes: job.maxBytes,
-        withinTarget: r.withinTarget,
+        withinTarget: r.fitsBytes,
         width: r.width,
         height: r.height,
         quality: Math.round(r.quality * 100) / 100,

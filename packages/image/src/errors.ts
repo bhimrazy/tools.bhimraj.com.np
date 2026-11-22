@@ -1,24 +1,24 @@
-export type ErrorCode =
+export type ImageErrorCode =
   | "decode_failed"
   | "unsupported_browser"
-  | "too_large"
+  | "too_many_pixels"
   | "aborted"
   | "timeout"
   | "internal";
 
-/** An engine failure the UI can switch on by `code`. Aborts keep the standard `AbortError` name. */
-export class EngineError extends Error {
-  readonly code: ErrorCode;
+/** An image failure the UI can switch on by `code`. Aborts keep the standard `AbortError` name. */
+export class ImageError extends Error {
+  readonly code: ImageErrorCode;
 
-  constructor(code: ErrorCode, message: string, options?: ErrorOptions) {
+  constructor(code: ImageErrorCode, message: string, options?: ErrorOptions) {
     super(message, options);
     this.code = code;
-    this.name = code === "aborted" ? "AbortError" : "EngineError";
+    this.name = code === "aborted" ? "AbortError" : "ImageError";
   }
 }
 
-export function errorCode(err: unknown): ErrorCode {
-  if (err instanceof EngineError) return err.code;
+export function toErrorCode(err: unknown): ImageErrorCode {
+  if (err instanceof ImageError) return err.code;
   if (err instanceof Error && err.name === "AbortError") return "aborted";
   return "internal";
 }

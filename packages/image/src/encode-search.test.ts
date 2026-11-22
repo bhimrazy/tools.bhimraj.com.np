@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  fitToTarget,
+  searchEncoding,
   FREE_QUALITY,
   MAX_QUALITY,
   MIN_QUALITY,
@@ -42,22 +42,22 @@ const perScale = (calls: Call[]) => {
 describe("fixed-size jobs search quality only", () => {
   test("fits on the first try at max quality", async () => {
     const { encode, calls } = fakeEncoder();
-    const r = await fitToTarget(encode, { maxBytes: 1_000_000 });
+    const r = await searchEncoding(encode, { maxBytes: 1_000_000 });
     expect(r).toMatchObject({
       quality: MAX_QUALITY,
       scale: 1,
-      withinTarget: true,
-      passes: 1,
+      fitsBytes: true,
+      attempts: 1,
     });
     expect(calls).toHaveLength(1);
   });
 
-  test("binary-searches quality within 8 passes and returns the best fit", async () => {
+  test("binary-searches quality within 8 attempts and returns the best fit", async () => {
     const { encode, calls } = fakeEncoder();
-    const r = await fitToTarget(encode, { maxBytes: 300_000 });
+    const r = await searchEncoding(encode, { maxBytes: 300_000 });
     expect(calls.length).toBeLessThanOrEqual(8);
-    expect(r.passes).toBe(calls.length);
-    expect(r).toMatchObject({ withinTarget: true, scale: 1 });
+    expect(r.attempts).toBe(calls.length);
+    expect(r).toMatchObject({ fitsBytes: true, scale: 1 });
     // 300 kB is hit at q = 0.55 exactly
     expect(r.quality).toBeGreaterThan(0.5);
     expect(r.quality).toBeLessThanOrEqual(0.55);
@@ -67,9 +67,9 @@ describe("fixed-size jobs search quality only", () => {
 
   test("never shrinks; reports the floor when it doesn't fit", async () => {
     const { encode, calls } = fakeEncoder();
-    const r = await fitToTarget(encode, { maxBytes: 20_000 });
+    const r = await searchEncoding(encode, { maxBytes: 20_000 });
     expect(r).toMatchObject({
-      withinTarget: false,
+      fitsBytes: false,
       scale: 1,
       quality: MIN_QUALITY,
     });
@@ -78,20 +78,23 @@ describe("fixed-size jobs search quality only", () => {
 
   test("lands between minBytes and maxBytes when possible", async () => {
     const { encode } = fakeEncoder();
-    const r = await fitToTarget(encode, {
+    const r = await searchEncoding(encode, {
       maxBytes: 300_000,
       minBytes: 250_000,
     });
-    expect(r.withinTarget).toBe(true);
+    expect(r.fitsBytes).toBe(true);
     expect(r.result.bytes).toBeGreaterThanOrEqual(250_000);
     expect(r.result.bytes).toBeLessThanOrEqual(300_000);
   });
 
-  test("too-small output reports withinTarget=false (the caller pads)", async () => {
+  test("too-small output reports fitsBytes=false (the caller pads)", async () => {
     const { encode } = fakeEncoder({ pixels: 10_000 });
-    const r = await fitToTarget(encode, { maxBytes: 20_000, minBytes: 8_000 });
+    const r = await searchEncoding(encode, {
+      maxBytes: 20_000,
+      minBytes: 8_000,
+    });
     expect(r).toMatchObject({
-      withinTarget: false,
+      fitsBytes: false,
       quality: MAX_QUALITY,
       scale: 1,
     });
@@ -103,8 +106,8 @@ describe("fixed-size jobs search quality only", () => {
     const { encode, calls } = fakeEncoder({
       jitter: (q) => (Math.round(q * 100) % 3 === 0 ? 40_000 : 0),
     });
-    const r = await fitToTarget(encode, { maxBytes: 300_000 });
-    expect(r.withinTarget).toBe(true);
+    const r = await searchEncoding(encode, { maxBytes: 300_000 });
+    expect(r.fitsBytes).toBe(true);
     expect(r.result.bytes).toBeLessThanOrEqual(300_000);
     expect(calls.length).toBeLessThanOrEqual(8);
     const fitting = calls.filter((c) => c.bytes <= 300_000);
@@ -115,7 +118,7 @@ describe("fixed-size jobs search quality only", () => {
 describe("free-size jobs choose scale first", () => {
   test("keeps full size when the start quality fits", async () => {
     const { encode, calls } = fakeEncoder();
-    const r = await fitToTarget(encode, {
+    const r = await searchEncoding(encode, {
       maxBytes: 1_000_000,
       policy: "free",
     });
@@ -127,12 +130,12 @@ describe("free-size jobs choose scale first", () => {
   test("12 MP at 100 kB: shrinks instead of dropping quality, in few full-size encodes", async () => {
     for (const detail of [0, 1]) {
       const { encode, calls } = fakeEncoder({ pixels: 12_000_000, detail });
-      const r = await fitToTarget(encode, {
+      const r = await searchEncoding(encode, {
         maxBytes: 100_000,
         policy: "free",
         minScale: 0.02,
       });
-      expect(r.withinTarget).toBe(true);
+      expect(r.fitsBytes).toBe(true);
       expect(r.result.bytes).toBeLessThanOrEqual(100_000);
       expect(r.quality).toBeGreaterThanOrEqual(FREE_QUALITY.min);
       expect(r.quality).toBeLessThanOrEqual(FREE_QUALITY.max);
@@ -143,11 +146,11 @@ describe("free-size jobs choose scale first", () => {
 
   test("bounds encodes per scale", async () => {
     const { encode, calls } = fakeEncoder({ pixels: 12_000_000, detail: 3 });
-    await fitToTarget(encode, {
+    await searchEncoding(encode, {
       maxBytes: 50_000,
       policy: "free",
       minScale: 0.01,
-      maxPasses: 5,
+      maxAttempts: 5,
     });
     const counts = perScale(calls);
     expect(counts.get(1)).toBeLessThanOrEqual(3);
@@ -156,27 +159,27 @@ describe("free-size jobs choose scale first", () => {
 
   test("drops below the quality floor only at the smallest scale", async () => {
     const { encode, calls } = fakeEncoder();
-    const r = await fitToTarget(encode, {
+    const r = await searchEncoding(encode, {
       maxBytes: 2_000,
       policy: "free",
       minScale: 0.1,
     });
     expect(r.scale).toBe(0.1);
-    expect(r.withinTarget).toBe(true);
+    expect(r.fitsBytes).toBe(true);
     expect(r.quality).toBeLessThan(FREE_QUALITY.min);
     const belowFloor = calls.filter((c) => c.quality < FREE_QUALITY.min);
     expect(belowFloor.every((c) => c.scale === 0.1)).toBe(true);
   });
 
-  test("impossible target returns the smallest output with withinTarget=false", async () => {
+  test("impossible target returns the smallest output with fitsBytes=false", async () => {
     const { encode } = fakeEncoder();
-    const r = await fitToTarget(encode, {
+    const r = await searchEncoding(encode, {
       maxBytes: 10,
       minScale: 0.2,
       policy: "free",
     });
     expect(r).toMatchObject({
-      withinTarget: false,
+      fitsBytes: false,
       scale: 0.2,
       quality: MIN_QUALITY,
     });
@@ -186,7 +189,7 @@ describe("free-size jobs choose scale first", () => {
   test("bounds the number of downscale steps", async () => {
     // A fixed header cost means no scale ever fits.
     const { encode, calls } = fakeEncoder({ jitter: () => 1_000 });
-    await fitToTarget(encode, {
+    await searchEncoding(encode, {
       maxBytes: 1,
       minScale: 0,
       maxScaleSteps: 3,
@@ -199,13 +202,13 @@ describe("free-size jobs choose scale first", () => {
 describe("validation and abort", () => {
   test("rejects invalid targets", async () => {
     const { encode } = fakeEncoder();
-    expect(fitToTarget(encode, { maxBytes: 0 })).rejects.toThrow(RangeError);
-    expect(fitToTarget(encode, { maxBytes: 10, minBytes: 20 })).rejects.toThrow(
-      RangeError,
-    );
+    expect(searchEncoding(encode, { maxBytes: 0 })).rejects.toThrow(RangeError);
+    expect(
+      searchEncoding(encode, { maxBytes: 10, minBytes: 20 }),
+    ).rejects.toThrow(RangeError);
   });
 
-  test("abort stops between passes", async () => {
+  test("abort stops between attempts", async () => {
     const ctrl = new AbortController();
     let n = 0;
     const { encode, calls } = fakeEncoder({
@@ -213,7 +216,10 @@ describe("validation and abort", () => {
         if (++n === 2) ctrl.abort();
       },
     });
-    const run = fitToTarget(encode, { maxBytes: 300_000, signal: ctrl.signal });
+    const run = searchEncoding(encode, {
+      maxBytes: 300_000,
+      signal: ctrl.signal,
+    });
     expect(run).rejects.toMatchObject({ name: "AbortError" });
     await run.catch(() => {});
     expect(calls).toHaveLength(2);
@@ -221,7 +227,7 @@ describe("validation and abort", () => {
 
   test("an already-aborted signal encodes nothing", async () => {
     const { encode, calls } = fakeEncoder();
-    const run = fitToTarget(encode, {
+    const run = searchEncoding(encode, {
       maxBytes: 300_000,
       signal: AbortSignal.abort(),
     });

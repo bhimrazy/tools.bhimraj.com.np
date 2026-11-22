@@ -1,10 +1,10 @@
-import { EngineError } from "./errors";
+import { ImageError } from "./errors";
 import type { CompressOptions, CompressResult, OutputFormat } from "./index";
 import {
   capLayout,
   capSize,
   computeLayout,
-  MAX_PIXELS,
+  MAX_CANVAS_PIXELS,
   pixelBudget,
   scaleLayout,
   type Layout,
@@ -12,12 +12,12 @@ import {
 } from "./layout";
 import { padJpeg } from "./pad";
 import { readImageSize } from "./image-size";
-import { fitToTarget } from "./encode-search";
+import { searchEncoding } from "./encode-search";
 
 /** 1 GiB as RGBA: no phone browser decodes this, so fail fast instead of crashing the tab. */
 const MAX_SOURCE_PIXELS = 2 ** 28;
 /** Downscaling never shrinks the shorter side below this. */
-const MIN_SIDE = 64;
+const MIN_SIDE_PX = 64;
 /** Reaches the JPEG SOF marker past typical EXIF and ICC segments. */
 const HEADER_BYTES = 256 * 1024;
 
@@ -25,7 +25,7 @@ type Canvas = OffscreenCanvas | HTMLCanvasElement;
 type Context = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
 const unsupported = () =>
-  new EngineError("unsupported_browser", "This browser can't process images");
+  new ImageError("unsupported_browser", "This browser can't process images");
 
 function surface(width: number, height: number): [Canvas, Context] {
   if (typeof OffscreenCanvas !== "undefined") {
@@ -33,7 +33,7 @@ function surface(width: number, height: number): [Canvas, Context] {
     const ctx = canvas.getContext("2d");
     if (ctx) return [canvas, ctx];
   }
-  // iOS < 16.4 has no OffscreenCanvas; the engine then runs this on the main thread.
+  // iOS < 16.4 has no OffscreenCanvas; the image worker then runs this on the main thread.
   if (typeof document !== "undefined") {
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -51,7 +51,7 @@ function toBlob(canvas: Canvas, type: string, quality: number): Promise<Blob> {
       (blob) =>
         blob
           ? resolve(blob)
-          : reject(new EngineError("internal", "Could not encode the image")),
+          : reject(new ImageError("internal", "Could not encode the image")),
       type,
       quality,
     ),
@@ -83,7 +83,7 @@ async function crop(
     resizeQuality: "high",
   });
   if (out.width === w && out.height === h) return out;
-  // Engines that ignore resize options return the crop unscaled; scale it on a canvas.
+  // Browsers that ignore resize options return the crop unscaled; scale it on a canvas.
   out.close();
   const [canvas, ctx] = surface(w, h);
   try {
@@ -98,14 +98,14 @@ async function crop(
 /**
  * Decodes at most `budget` pixels. The header gives the size up front, so large images decode
  * straight to the capped size instead of holding a full-size copy (50 MP ≈ 200 MB) first.
- * EXIF orientation is applied: `imageOrientation` is left at its default, since engines that only
+ * EXIF orientation is applied: `imageOrientation` is left at its default, since browsers that only
  * know the old enum reject "from-image".
  */
 async function decode(file: Blob, budget: number): Promise<ImageBitmap> {
   const head = new Uint8Array(await file.slice(0, HEADER_BYTES).arrayBuffer());
   const size = readImageSize(head);
   if (size && size.width * size.height > MAX_SOURCE_PIXELS)
-    throw new EngineError("too_large", "This image has too many pixels");
+    throw new ImageError("too_many_pixels", "This image has too many pixels");
   const capped =
     size && size.width * size.height > budget
       ? capSize(size.width, size.height, budget)
@@ -123,15 +123,16 @@ async function decode(file: Blob, budget: number): Promise<ImageBitmap> {
         : {},
     );
   } catch (err) {
-    throw new EngineError("decode_failed", "This file couldn't be decoded", {
+    throw new ImageError("decode_failed", "This file couldn't be decoded", {
       cause: err,
     });
   }
-  // Unknown header, or an engine that ignored the resize options.
-  const fit = capSize(bitmap.width, bitmap.height, budget);
-  if (fit.width === bitmap.width && fit.height === bitmap.height) return bitmap;
+  // Unknown header, or a browser that ignored the resize options.
+  const within = capSize(bitmap.width, bitmap.height, budget);
+  if (within.width === bitmap.width && within.height === bitmap.height)
+    return bitmap;
   try {
-    return await crop(bitmap, whole(bitmap), fit.width, fit.height);
+    return await crop(bitmap, whole(bitmap), within.width, within.height);
   } finally {
     bitmap.close();
   }
@@ -193,7 +194,7 @@ export async function compressImage(
         ...(height && { height }),
         ...(opts.fit && { fit: opts.fit }),
       }),
-      MAX_PIXELS,
+      MAX_CANVAS_PIXELS,
     );
     const { src, dst } = base;
     const identity =
@@ -202,7 +203,7 @@ export async function compressImage(
       dst.w === src.w &&
       dst.h === src.h;
     if (!identity) {
-      // Crop + resize once up front, so later passes work on output-sized pixels and the source can go.
+      // Crop + resize once up front, so later attempts work on output-sized pixels and the source can go.
       image = await crop(source, src, dst.w, dst.h);
       source.close();
     }
@@ -243,7 +244,7 @@ export async function compressImage(
       if (blob.type !== format) {
         // Safari can't encode WebP and silently returns PNG instead.
         if (format === "image/jpeg")
-          throw new EngineError(
+          throw new ImageError(
             "unsupported_browser",
             "This browser can't encode JPEG",
           );
@@ -259,15 +260,15 @@ export async function compressImage(
       };
     };
 
-    const fit = await fitToTarget(encode, {
+    const found = await searchEncoding(encode, {
       maxBytes: opts.maxBytes,
       minBytes,
       ...(signal && { signal }),
       policy: fixedSize ? "fixed" : "free",
-      minScale: Math.min(1, MIN_SIDE / Math.min(base.width, base.height)),
+      minScale: Math.min(1, MIN_SIDE_PX / Math.min(base.width, base.height)),
     });
-    const { width: w, height: h, format: f } = fit.result;
-    let { blob } = fit.result;
+    const { width: w, height: h, format: f } = found.result;
+    let { blob } = found.result;
     // WebP isn't padded: byte minimums come from portals that take JPEG only, and a valid
     // padding chunk would mean rewriting a simple WebP into the extended (VP8X) layout.
     if (blob.size < minBytes && f === "image/jpeg") {
@@ -283,9 +284,9 @@ export async function compressImage(
       bytes: blob.size,
       width: w,
       height: h,
-      quality: fit.quality,
+      quality: found.quality,
       format: f,
-      withinTarget: blob.size >= minBytes && blob.size <= opts.maxBytes,
+      fitsBytes: blob.size >= minBytes && blob.size <= opts.maxBytes,
     };
   } finally {
     source.close();

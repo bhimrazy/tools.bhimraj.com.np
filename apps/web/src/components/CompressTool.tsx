@@ -1,7 +1,7 @@
 import type {
   CompressOptions,
   CompressResult,
-  ImageEngine,
+  ImageWorker,
   OutputFormat,
 } from "@tools/image";
 import type {
@@ -105,7 +105,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
 
-  const engine = useRef<ImageEngine | null>(null);
+  const worker = useRef<ImageWorker | null>(null);
   const job = useRef<AbortController | null>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
 
@@ -120,7 +120,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
   useEffect(
     () => () => {
       job.current?.abort();
-      engine.current?.dispose();
+      worker.current?.dispose();
     },
     [],
   );
@@ -161,19 +161,19 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
       setOriginal({ name: next.name, bytes: next.size, ...dims });
       setStatus("Compressing on your device…");
 
-      if (!engine.current) {
-        const { createImageEngine } = await import("@tools/image");
-        engine.current = createImageEngine();
+      if (!worker.current) {
+        const { createImageWorker } = await import("@tools/image");
+        worker.current = createImageWorker();
       }
       const options: CompressOptions = { fit: "cover", ...opts };
-      const out = await engine.current.compress(next, options, ctrl.signal);
+      const out = await worker.current.compress(next, options, ctrl.signal);
       if (ctrl.signal.aborted) return;
 
       const ext = out.format === "image/webp" ? "webp" : "jpg";
       const filename = `${stem(next.name)}-${out.width}x${out.height}-${Math.round(out.bytes / KB_MAX)}kb.${ext}`;
       setResult({ ...out, url: URL.createObjectURL(out.blob), filename });
       setStatus(
-        out.withinTarget
+        out.fitsBytes
           ? `Done: ${formatKb(out.bytes)}, ${out.width} × ${out.height} px. Ready to download.`
           : `Done, but the file is ${formatKb(out.bytes)}, still over the limit.`,
       );
@@ -371,9 +371,9 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
               Result
             </h2>
             <span
-              class={`badge ${result.withinTarget ? "badge-success" : "badge-danger"}`}
+              class={`badge ${result.fitsBytes ? "badge-success" : "badge-danger"}`}
             >
-              {result.withinTarget ? `Within ${limit}` : "Over the limit"}
+              {result.fitsBytes ? `Within ${limit}` : "Over the limit"}
             </span>
           </div>
           <img
@@ -403,7 +403,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
                 <dd>{formatBytes(result.bytes)}</dd>
               </div>
             </dl>
-            {!result.withinTarget && (
+            {!result.fitsBytes && (
               <p class="text-sm text-muted">
                 Couldn't get under {limit} even at the lowest quality. Crop
                 closer or use a smaller width and height.
