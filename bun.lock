@@ -14,9 +14,9 @@
       "version": "0.0.0",
       "dependencies": {
         "@astrojs/preact": "6.1.2",
-        "@tools/engines": "workspace:*",
+        "@tools/image": "workspace:*",
         "@tools/presets": "workspace:*",
-        "@tools/seo": "workspace:*",
+        "@tools/site": "workspace:*",
         "astro": "7.4.8",
         "preact": "11.2.0",
       },
@@ -34,7 +34,7 @@
       "name": "@tools/bench",
       "version": "0.0.0",
       "dependencies": {
-        "@tools/engines": "workspace:*",
+        "@tools/image": "workspace:*",
         "@tools/presets": "workspace:*",
       },
       "devDependencies": {
@@ -44,8 +44,8 @@
         "vite": "catalog:",
       },
     },
-    "packages/engines": {
-      "name": "@tools/engines",
+    "packages/image": {
+      "name": "@tools/image",
       "version": "0.0.0",
       "devDependencies": {
         "@tools/tsconfig": "workspace:*",
@@ -63,8 +63,8 @@
         "@types/bun": "catalog:",
       },
     },
-    "packages/seo": {
-      "name": "@tools/seo",
+    "packages/site": {
+      "name": "@tools/site",
       "version": "0.0.0",
       "devDependencies": {
         "@tools/tsconfig": "workspace:*",
@@ -461,11 +461,11 @@
 
     "@tools/bench": ["@tools/bench@workspace:bench"],
 
-    "@tools/engines": ["@tools/engines@workspace:packages/engines"],
+    "@tools/image": ["@tools/image@workspace:packages/image"],
 
     "@tools/presets": ["@tools/presets@workspace:packages/presets"],
 
-    "@tools/seo": ["@tools/seo@workspace:packages/seo"],
+    "@tools/site": ["@tools/site@workspace:packages/site"],
 
     "@tools/tsconfig": ["@tools/tsconfig@workspace:packages/tsconfig"],
 

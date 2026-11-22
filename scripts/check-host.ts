@@ -7,7 +7,7 @@ const HOST = "bhimraj.com.np";
 // The GitHub repo is named after the host; links to it are fine.
 const REPO = /github\.com\/bhimrazy\/tools\.bhimraj\.com\.np/g;
 const ALLOWED = new Set([
-  "packages/seo/src/origin.ts",
+  "packages/site/src/origin.ts",
   "apps/web/wrangler.jsonc",
 ]);
 
@@ -31,7 +31,7 @@ for (const f of scanned) {
 }
 if (hits.length) {
   console.error(
-    `Hostname "${HOST}" is hard-coded in:\n  ${hits.join("\n  ")}\nUse SITE_ORIGIN via @tools/seo.`,
+    `Hostname "${HOST}" is hard-coded in:\n  ${hits.join("\n  ")}\nUse SITE_ORIGIN via @tools/site.`,
   );
   process.exit(1);
 }

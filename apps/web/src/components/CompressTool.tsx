@@ -3,7 +3,7 @@ import type {
   CompressResult,
   ImageEngine,
   OutputFormat,
-} from "@tools/engines/image";
+} from "@tools/image";
 import type {
   TargetedDragEvent,
   TargetedEvent,
@@ -162,7 +162,7 @@ export function CompressTool({ spec, kind = "photo" }: CompressToolProps) {
       setStatus("Compressing on your device…");
 
       if (!engine.current) {
-        const { createImageEngine } = await import("@tools/engines/image");
+        const { createImageEngine } = await import("@tools/image");
         engine.current = createImageEngine();
       }
       const options: CompressOptions = { fit: "cover", ...opts };

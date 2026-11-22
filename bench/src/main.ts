@@ -1,6 +1,6 @@
-import { createImageEngine } from "@tools/engines/image";
+import { createImageEngine } from "@tools/image";
 // Not exported by the package: called directly so CPU throttling (main thread only) applies.
-import { compressImage } from "../../packages/engines/src/image/canvas";
+import { compressImage } from "@tools/image/compress";
 import { presets } from "@tools/presets";
 import { inputs, jobs, type InputSpec, type JobSpec } from "./cases";
 

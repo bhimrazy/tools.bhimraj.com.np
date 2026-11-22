@@ -154,7 +154,7 @@ export function createImageEngine(options: EngineOptions = {}): ImageEngine {
   };
 
   const runOnMain = (job: Job) => {
-    import("./canvas")
+    import("./compress")
       .then(({ compressImage }) =>
         compressImage(job.file, job.opts, job.ctrl.signal),
       )

@@ -1,4 +1,4 @@
-import { compressImage } from "./canvas";
+import { compressImage } from "./compress";
 import { errorCode } from "./errors";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 

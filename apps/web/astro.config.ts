@@ -1,6 +1,6 @@
 import preact from "@astrojs/preact";
 import tailwindcss from "@tailwindcss/vite";
-import { siteOrigin } from "@tools/seo";
+import { siteOrigin } from "@tools/site";
 import { defineConfig } from "astro/config";
 
 // CSP: public/_headers ships `script-src 'self'; style-src 'self'` with no hashes.

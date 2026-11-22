@@ -14,9 +14,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@tools/engines": "workspace:*",
+    "@tools/image": "workspace:*",
     "@tools/presets": "workspace:*",
-    "@tools/seo": "workspace:*",
+    "@tools/site": "workspace:*",
     "@astrojs/preact": "6.1.2",
     "astro": "7.4.8",
     "preact": "11.2.0"

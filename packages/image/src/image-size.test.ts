@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readImageSize } from "./probe";
+import { readImageSize } from "./image-size";
 
 const u16 = (n: number) => [n >> 8, n & 0xff];
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));

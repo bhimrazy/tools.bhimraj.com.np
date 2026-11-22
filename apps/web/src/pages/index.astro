@@ -2,7 +2,7 @@
 import { presets } from "@tools/presets";
 import PresetCard from "../components/PresetCard.astro";
 import Base from "../layouts/Base.astro";
-import { countryName, groupByCountry } from "../lib/presets";
+import { countryName, groupByCountry } from "../lib/format";
 
 const groups = groupByCountry(presets);
 ---

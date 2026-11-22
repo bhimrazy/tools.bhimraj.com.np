@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { fitToTarget, FREE_QUALITY, MAX_QUALITY, MIN_QUALITY } from "./search";
+import {
+  fitToTarget,
+  FREE_QUALITY,
+  MAX_QUALITY,
+  MIN_QUALITY,
+} from "./encode-search";
 
 interface Call {
   quality: number;

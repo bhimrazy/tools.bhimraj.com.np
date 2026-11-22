@@ -9,7 +9,7 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@tools/engines": "workspace:*",
+    "@tools/image": "workspace:*",
     "@tools/presets": "workspace:*"
   },
   "devDependencies": {

@@ -6,7 +6,7 @@ import type { ToolSpec } from "../components/CompressTool";
 import Base from "../layouts/Base.astro";
 import { specIssueUrl } from "../lib/links";
 import { statedMaxKb } from "../lib/units";
-import { countryName, dimensions, FORMAT_LABEL, formatDate, sizeRange } from "../lib/presets";
+import { countryName, dimensions, FORMAT_LABEL, formatDate, sizeRange } from "../lib/format";
 
 export const getStaticPaths = (() =>
   presets.map((preset) => ({ params: { path: preset.path }, props: { preset } }))) satisfies GetStaticPaths;

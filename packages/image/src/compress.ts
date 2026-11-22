@@ -11,8 +11,8 @@ import {
   type Rect,
 } from "./layout";
 import { padJpeg } from "./pad";
-import { readImageSize } from "./probe";
-import { fitToTarget } from "./search";
+import { readImageSize } from "./image-size";
+import { fitToTarget } from "./encode-search";
 
 /** 1 GiB as RGBA: no phone browser decodes this, so fail fast instead of crashing the tab. */
 const MAX_SOURCE_PIXELS = 2 ** 28;
