@@ -82,8 +82,12 @@ jobs:
       - id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        # One archive upload instead of one request per file.
-        run: echo "url=$("$VERCEL" deploy --prebuilt --archive=tgz)" >> "$GITHUB_OUTPUT"
+        # The CLI wants the project's root directory to exist; one archive upload instead of one
+        # request per file.
+        run: |
+          mkdir -p apps/web
+          url=$("$VERCEL" deploy --prebuilt --archive=tgz)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
       - env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
