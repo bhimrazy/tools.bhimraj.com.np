@@ -1,5 +1,5 @@
 import type { Preset } from "../index";
-import { kbMax } from "../schema";
+import { kbMax } from "../bytes";
 
 const common = {
   country: "BD",
@@ -19,6 +19,7 @@ export const bd: Preset[] = [
     kind: "photo",
     output: {
       format: "image/jpeg",
+      fit: "cover",
       width: 300,
       height: 300,
       maxBytes: kbMax(100),
@@ -34,6 +35,7 @@ export const bd: Preset[] = [
     kind: "signature",
     output: {
       format: "image/jpeg",
+      fit: "contain",
       width: 300,
       height: 80,
       maxBytes: kbMax(60),

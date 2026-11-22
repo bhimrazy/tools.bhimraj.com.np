@@ -1,9 +1,7 @@
 import { z } from "zod";
 import type { Preset } from "./index";
 
-/** KB on portals is ambiguous: maxBytes = KB x 1000 and minBytes = KB x 1024 are safe either way. */
-export const kbMax = (kb: number): number => kb * 1000;
-export const kbMin = (kb: number): number => kb * 1024;
+// Byte limits carry ~1% headroom via kbMax/kbMin (see bytes.ts); zod-validated data, tests and build only.
 
 const dim = z.number().int().positive();
 const isoDate = z
@@ -23,9 +21,10 @@ export const presetSchema = z
     title: z.string().min(1),
     kind: z.enum(["photo", "signature", "scan"]),
     output: z.strictObject({
-      format: z.enum(["image/jpeg", "image/png", "image/webp"]),
+      format: z.enum(["image/jpeg", "image/webp"]),
       width: dim.optional(),
       height: dim.optional(),
+      fit: z.enum(["cover", "contain"]),
       minBytes: dim.optional(),
       maxBytes: dim,
       background: z
@@ -51,6 +50,10 @@ export const presetSchema = z
     (p) =>
       p.output.minBytes === undefined || p.output.minBytes < p.output.maxBytes,
     "minBytes must be < maxBytes",
+  )
+  .refine(
+    (p) => p.kind === "photo" || p.output.fit === "contain",
+    "signatures and scans must use fit contain",
   )
   .refine(
     (p) => p.verifiedAt === null || p.source !== null,

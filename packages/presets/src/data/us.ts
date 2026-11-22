@@ -1,5 +1,5 @@
 import type { Preset } from "../index";
-import { kbMax } from "../schema";
+import { kbMax } from "../bytes";
 
 export const us: Preset[] = [
   {
@@ -11,6 +11,7 @@ export const us: Preset[] = [
     kind: "photo",
     output: {
       format: "image/jpeg",
+      fit: "cover",
       width: 600,
       height: 600,
       maxBytes: kbMax(240),
