@@ -1,4 +1,5 @@
 import { compressImage } from "./canvas";
+import { errorCode } from "./errors";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -19,8 +20,12 @@ scope.onmessage = async ({ data: msg }: MessageEvent<WorkerRequest>) => {
       result: await compressImage(msg.file, msg.opts, ctrl.signal),
     });
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    reply({ id: msg.id, ok: false, error, aborted: ctrl.signal.aborted });
+    reply({
+      id: msg.id,
+      ok: false,
+      code: ctrl.signal.aborted ? "aborted" : errorCode(err),
+      error: err instanceof Error ? err.message : String(err),
+    });
   } finally {
     jobs.delete(msg.id);
   }
