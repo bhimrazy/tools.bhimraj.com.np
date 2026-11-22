@@ -8,9 +8,10 @@ on:
 permissions:
   contents: read
 
+# Runs on main are never cancelled: production.yml deploys the commit whose CI succeeded.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:

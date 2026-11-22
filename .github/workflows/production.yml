@@ -1,0 +1,93 @@
+name: Vercel Production
+
+# Deploys main after CI passes on a push to it, or by hand from main.
+on:
+  # Runs main's own copy of this file; the job's `if` only accepts a successful push run on main.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    # Main-only (branch policy), so PR runs never see this token.
+    environment: vercel-production
+    permissions:
+      contents: read
+      actions: read
+    env:
+      # The commit CI tested, not whatever main points at now.
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      VERCEL: ${{ github.workspace }}/.github/vercel-cli/node_modules/.bin/vercel
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0 # to diff against the last deployed commit
+          persist-credentials: false
+
+      # Skips when only docs, tests or CI changed since the newest production deploy, and when that
+      # deploy's commit can't be read (fails closed; run by hand). A manual run needs CI green.
+      - id: gate
+        env:
+          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          deploy() { echo "deploy=true" >> "$GITHUB_OUTPUT"; echo "$1" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          skip() { echo "::warning::Production deploy skipped: $1"; echo "Skipped: $1" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          if [ "$EVENT" = workflow_dispatch ]; then
+            passed=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+              -f head_sha="$SHA" -f event=push -f status=success --jq .total_count)
+            [ "$passed" -gt 0 ] || { echo "::error::CI hasn't passed on ${SHA:0:7}."; exit 1; }
+            deploy "Manual run of ${SHA:0:7}."
+          fi
+          last=$(curl -fsS -H @- \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&state=READY&limit=1" \
+            <<< "Authorization: Bearer $VERCEL_TOKEN" |
+            jq -er '.deployments | if length == 0 then "none" else .[0].meta.githubCommitSha // "" end') ||
+            skip "can't read the last production deploy from Vercel."
+          [ "$last" != none ] || deploy "First production deploy."
+          git cat-file -e "$last^{commit}" 2>/dev/null ||
+            skip "the last production deploy's commit (${last:-unknown}) isn't on main."
+          # grep exits 1 when nothing is left; that means nothing ships.
+          shipped=$(git diff --name-only "$last" "$SHA" |
+            grep -vE '^(docs|bench|scripts|\.github|\.claude|\.githooks|apps/web/e2e)/|\.md$|\.test\.ts$' || true)
+          shipped+=$(git diff --name-only "$last" "$SHA" -- .github/vercel-cli/)
+          [ -n "$shipped" ] || skip "nothing that ships changed since ${last:0:7}."
+          deploy "Deploying ${SHA:0:7} (last production: ${last:0:7})."
+
+      - if: steps.gate.outputs.deploy == 'true'
+        uses: ./.github/actions/setup
+      - if: steps.gate.outputs.deploy == 'true'
+        run: bun install --frozen-lockfile --cwd .github/vercel-cli
+      - if: steps.gate.outputs.deploy == 'true'
+        run: '"$VERCEL" pull --yes --environment=production'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      # No token here: the build runs repository code.
+      - if: steps.gate.outputs.deploy == 'true'
+        run: '"$VERCEL" build --prod'
+      # The meta is what the gate above reads on the next run.
+      - if: steps.gate.outputs.deploy == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: '"$VERCEL" deploy --prebuilt --prod --archive=tgz --meta githubCommitSha="$SHA"'

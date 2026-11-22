@@ -1,0 +1,56 @@
+name: Vercel Preview
+
+# Deploys each push to a ready-for-review PR from this repository and comments the URL.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths-ignore: ["docs/**", "**/*.md", "apps/web/e2e/**", "bench/**"]
+
+permissions: {}
+
+concurrency:
+  group: vercel-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Fork and Dependabot PRs get no secrets, so a deploy could only fail.
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    environment: vercel-preview
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      VERCEL: ${{ github.workspace }}/.github/vercel-cli/node_modules/.bin/vercel
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: bun install --frozen-lockfile --cwd .github/vercel-cli
+      - run: '"$VERCEL" pull --yes --environment=preview'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      # No token here: the build runs repository code.
+      - run: '"$VERCEL" build'
+      - id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        # One archive upload instead of one request per file.
+        run: echo "url=$("$VERCEL" deploy --prebuilt --archive=tgz)" >> "$GITHUB_OUTPUT"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ steps.deploy.outputs.url }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none \
+            --body "**Preview:** $URL (commit \`${SHA:0:7}\`)"
