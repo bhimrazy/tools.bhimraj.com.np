@@ -16,7 +16,8 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
 - **Host-neutral.** The production host lives only in `packages/site/src/origin.ts`
   and `apps/web/wrangler.jsonc`; `bun run check:host` fails otherwise.
 - **Permissive dependencies only** (MIT/BSD/Apache/MPL) until the v2 licence decision;
-  no AGPL libraries, no non-commercial models.
+  no AGPL libraries, no non-commercial models. Exception: fonts may be OFL-1.1, self-hosted and
+  unmodified (Onest, Noto Sans Devanagari, Noto Sans Bengali).
 
 ## Conventions
 
@@ -27,6 +28,9 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
   refuses releases younger than 7 days; don't bypass it.
 - CI actions are pinned to full commit SHAs with a version comment.
 - Rust/WASM only for a measured hot path; see `docs/adr/0004-rust-wasm.md`.
+- UI: React islands hydrated by our own module, never `client:*` (CSP); shadcn/ui on Base UI
+  in `apps/web/src/components/ui`; `lucide-react` imported per icon. See `docs/adr/0005-react-islands.md`
+  and `apps/web/DESIGN.md`. Colours come only from the theme block in `apps/web/src/styles/global.css`.
 - Research and business notes go in `.research/` (gitignored). No strategy, market or revenue detail in commits,
   PRs, issues or `.claude/`.
 - Third-party references (competitor or reference sites and repos, screenshots, inspiration notes) also live

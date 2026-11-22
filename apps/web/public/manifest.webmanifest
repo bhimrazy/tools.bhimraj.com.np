@@ -1,18 +1,42 @@
 {
-  "name": "Tools: private image & PDF tools",
+  "name": "Tools by Bhimraj",
   "short_name": "Tools",
-  "description": "Form-ready photos and signatures, made on your device. Files never leave it.",
+  "description": "Photos and signatures at the exact size your form asks for. Your files stay on your device.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#fafafa",
-  "theme_color": "#fafafa",
+  "background_color": "#f5f5f5",
+  "theme_color": "#171717",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -1,32 +1,46 @@
 ---
 import CompressIsland from "../components/CompressIsland.astro";
+import Learn from "../components/Learn.astro";
 import Base from "../layouts/Base.astro";
 ---
 
 <Base
   title="Compress image to KB: 20, 50, 100 KB or any size"
-  description="Compress a photo to a target size in KB, optionally resized to an exact width and height. Runs in your browser: your image is never uploaded."
+  description="Compress a photo to a size limit in KB, and optionally to an exact width and height. It runs in your browser, so your image is never uploaded."
   path="/compress-image"
+  section="image"
 >
-  <div class="grid gap-2 pb-5">
-    <h1 class="text-2xl tracking-tight sm:text-3xl">Compress an image to a size in KB</h1>
-    <p class="text-muted">Set the limit, pick a photo, download. Nothing is uploaded.</p>
-  </div>
+  <nav aria-label="Breadcrumb" class="mb-3 flex flex-wrap gap-1.5 text-[13px] text-muted-foreground">
+    <a href="/" class="text-muted-foreground no-underline">Home</a><span aria-hidden="true">/</span>
+    <span>Image tools</span><span aria-hidden="true">/</span><span>Compress to KB</span>
+  </nav>
+  <h1 class="t-h1">Compress an image to a size in KB</h1>
+  <p class="mt-2 mb-4 flex flex-wrap gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground md:mb-5">
+    <span>Free</span><span aria-hidden="true">·</span><span>Your image stays on this device</span>
+  </p>
 
   <CompressIsland />
 
-  <section class="mt-12 grid max-w-prose gap-3 border-t border-border pt-8" aria-labelledby="how-heading">
-    <h2 id="how-heading" class="text-lg">How it works</h2>
-    <p>
-      Your browser resizes the image and saves it as a JPEG, lowering quality step by step until the file is under
-      your limit. It all happens on this device, so it works on slow connections and your photo stays private.
-    </p>
-    <p>
-      Leave width and height empty to keep the original proportions. Set both to crop to that exact size from the
-      centre, which is what most application forms expect.
-    </p>
-    <p class="text-sm text-muted">
-      “KB” here means 1,000 bytes, the stricter reading, so the file passes forms that count 1,024 bytes too.
-    </p>
-  </section>
+  <Learn
+    steps={[
+      "Enter the size your form asks for, in KB.",
+      "Add your image. We make it smaller on this device.",
+      "We check the saved file, then you download it.",
+    ]}
+    faq={[
+      [
+        "Why can't it reach my limit?",
+        "Large images need more KB. Making the image fewer pixels wide lets it get smaller. The fix button does this for you.",
+      ],
+      [
+        "Is 1 KB 1,000 or 1,024 bytes?",
+        "Forms differ. We stay under both, with a little room to spare: a 50 KB limit gives a file of at most 49,500 bytes.",
+      ],
+      [
+        "What do width and height do?",
+        "Leave them empty to keep the shape of your image. Set both to crop it to that exact size from the centre, which most forms expect.",
+      ],
+      ["Is my photo uploaded?", "No. It stays on this device. Your browser does all the work."],
+    ]}
+  />
 </Base>

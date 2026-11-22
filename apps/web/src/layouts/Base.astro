@@ -1,5 +1,7 @@
 ---
-import { absoluteUrl, REPO_URL } from "@tools/site";
+import { absoluteUrl, NEW_ISSUE_URL, REPO_URL } from "@tools/site";
+import Smartphone from "lucide-react/icons/smartphone";
+import { Lockup } from "../components/brand/Mark";
 import "../styles/global.css";
 
 interface Props {
@@ -8,11 +10,17 @@ interface Props {
   /** Site path, e.g. "/compress-image"; used for canonical and og:url. */
   path: string;
   noindex?: boolean;
+  /** Which main nav item this page belongs to. */
+  section?: "forms" | "image";
 }
 
-const { title, description, path, noindex = false } = Astro.props;
+const { title, description, path, noindex = false, section } = Astro.props;
 const canonical = absoluteUrl(path);
-const fullTitle = path === "/" ? title : `${title} · Tools`;
+const fullTitle = path === "/" ? title : `${title} · Tools by Bhimraj`;
+const nav = [
+  { id: "forms", href: "/#forms", label: "Forms" },
+  { id: "image", href: "/compress-image", label: "Image" },
+] as const;
 ---
 
 <!doctype html>
@@ -23,40 +31,85 @@ const fullTitle = path === "/" ? title : `${title} · Tools`;
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
-    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Tools" />
+    <meta property="og:site_name" content="Tools by Bhimraj" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta name="twitter:card" content="summary" />
   </head>
-  <body class="flex min-h-dvh flex-col text-base antialiased">
-    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2">
+  <body class="flex min-h-dvh flex-col bg-paper text-ink">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-4 focus:z-10 focus:rounded-lg focus:bg-card focus:px-3 focus:py-2"
+    >
       Skip to content
     </a>
-    <header class="border-b border-border bg-surface">
-      <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
-        <a href="/" class="flex items-center gap-2 text-sm font-semibold text-text no-underline">
-          <img src="/icon.svg" alt="" width="24" height="24" />
-          Tools
-        </a>
-        <nav aria-label="Main">
-          <a href="/compress-image" class="text-sm text-muted no-underline hover:text-text">Compress image</a>
+    <header class="border-b border-line bg-card">
+      <div class="mx-auto flex min-h-[60px] w-full max-w-[1120px] items-center gap-3 px-4 md:min-h-[68px] md:gap-5 md:px-8">
+        <Lockup href="/" className="text-xl md:text-[21px]" />
+        <nav aria-label="Main" class="ml-auto flex gap-0.5 md:ml-0 md:mr-auto">
+          {
+            nav.map((n) => (
+              <a
+                href={n.href}
+                aria-current={section === n.id ? "page" : undefined}
+                class="inline-flex min-h-11 items-center rounded-sm px-2.5 text-[15px] font-medium text-ink-2 no-underline aria-[current=page]:rounded-none aria-[current=page]:text-ink aria-[current=page]:shadow-[inset_0_-2px_0_var(--color-accent)]"
+              >
+                {n.label}
+              </a>
+            ))
+          }
         </nav>
+        <p class="hidden items-center gap-1.5 text-[13px] font-[550] text-ink-2 md:inline-flex">
+          <Smartphone aria-hidden="true" className="size-4 text-accent-ink" strokeWidth={2} />
+          0 files uploaded
+          <span class="sr-only">. Your files stay on this device.</span>
+        </p>
       </div>
     </header>
-    <main id="main" class="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:py-12">
-      <slot />
+    <main id="main" class="flex-1 pt-4 pb-10 md:pt-6 md:pb-16">
+      <div class="mx-auto w-full max-w-[1120px] px-4 md:px-8">
+        <slot />
+      </div>
     </main>
-    <footer class="border-t border-border">
-      <div class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-5 text-sm text-muted">
-        <p>Files never leave your device. No uploads, no tracking.</p>
-        <a href={REPO_URL} class="text-muted">Source on GitHub</a>
+    <footer class="border-t border-line bg-card">
+      <div class="mx-auto grid w-full max-w-[1120px] grid-cols-2 gap-x-4 gap-y-5 px-4 py-6 text-sm md:grid-cols-5 md:px-8">
+        <div>
+          <h2 class="mb-1.5 text-[13px] font-[650]">Forms</h2>
+          <a href="/#forms" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">All forms</a>
+        </div>
+        <div>
+          <h2 class="mb-1.5 text-[13px] font-[650]">Image</h2>
+          <a href="/compress-image" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">Compress to KB</a>
+        </div>
+        <div>
+          <h2 class="mb-1.5 text-[13px] font-[650]">About</h2>
+          <a href={NEW_ISSUE_URL} rel="noopener noreferrer external" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">
+            Report a different size rule
+          </a>
+          <a href={REPO_URL} rel="noopener noreferrer external" class="block py-2.5 text-ink-2 no-underline md:py-[3px]">
+            Source code
+          </a>
+        </div>
+      </div>
+      <div class="on-band border-t border-band-edge">
+        <div class="mx-auto flex w-full max-w-[1120px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-5 md:px-8">
+          <Lockup className="text-[22px]" />
+          <p class="max-w-[52ch] text-sm">
+            Photos and signatures at the exact size your form asks for. Free, and your files stay on your device.
+          </p>
+          <p class="inline-flex items-center gap-1.5 text-[13px] font-semibold md:ml-auto">
+            <Smartphone aria-hidden="true" className="size-4" strokeWidth={2} />
+            0 files uploaded
+          </p>
+        </div>
       </div>
     </footer>
   </body>
