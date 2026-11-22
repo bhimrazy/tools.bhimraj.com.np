@@ -124,11 +124,11 @@ const api = {
 export function presetJobs(): BenchJob[] {
   const out: BenchJob[] = [];
   for (const [id, input] of [
-    ["np-lok-sewa-photo", "photo-12mp"],
-    ["np-lok-sewa-signature", "signature-2000x600"],
+    ["np-psc-lok-sewa-application-photo", "photo-12mp"],
+    ["np-psc-lok-sewa-application-signature", "signature-2000x600"],
   ] as const) {
     const p = presets.find((x) => x.id === id);
-    if (!p) continue;
+    if (!p) throw new Error(`bench preset missing: ${id}`);
     const o = p.rule;
     out.push({
       input,

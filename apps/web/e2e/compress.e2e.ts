@@ -27,15 +27,16 @@ test("Lok Sewa photo preset gives exactly 300x350 inside its byte window", async
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
-  await page.goto("/np/lok-sewa-photo");
+  await page.goto("/forms/np/psc/lok-sewa-application#photo");
+  const section = page.locator("section#photo");
   const photo = await makeImage(page, {
     name: "me.jpg",
     width: 3000,
     height: 2000,
   });
-  await pickFile(page, photo);
+  await pickFile(section, photo);
 
-  const { filename, buffer } = await downloadResult(page, testInfo);
+  const { filename, buffer } = await downloadResult(page, testInfo, section);
   const { width, height } = await decodeImage(page, buffer);
   expect([width, height]).toEqual([300, 350]);
   expect(filename).toMatch(/-300x350-\d+kb\.jpg$/);
@@ -100,4 +101,21 @@ test("picking a new file mid-job cancels the first", async ({
     /^second-/,
   );
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("a form page holds one tool per upload, each with its own size rule", async ({
+  page,
+}) => {
+  await page.goto("/forms/np/psc/lok-sewa-application");
+  for (const [id, box] of [
+    ["photo", "300 × 350 px"],
+    ["signature", "300 × 80 px"],
+  ] as const) {
+    const section = page.locator(`section#${id}`);
+    await expect(section.getByLabel(/^Choose/)).toHaveAttribute(
+      "id",
+      `${id}-file`,
+    );
+    await expect(section.getByText(box).first()).toBeVisible();
+  }
 });

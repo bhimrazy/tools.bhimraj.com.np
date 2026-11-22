@@ -4,6 +4,9 @@ import { kbToMaxBytes } from "../bytes";
 const common = {
   country: "BD",
   portal: "Teletalk Alljobs (alljobs.teletalk.com.bd)",
+  org: "teletalk",
+  form: "job-application",
+  formTitle: "Teletalk job application",
   source: null,
   verifiedAt: null,
 } as const;
@@ -13,8 +16,8 @@ const caveat =
 export const bd: Preset[] = [
   {
     ...common,
-    id: "bd-teletalk-photo",
-    path: "bd/teletalk-photo",
+    id: "bd-teletalk-job-application-photo",
+    upload: "photo",
     title: "Teletalk job application photo",
     kind: "photo",
     rule: {
@@ -29,8 +32,8 @@ export const bd: Preset[] = [
   },
   {
     ...common,
-    id: "bd-teletalk-signature",
-    path: "bd/teletalk-signature",
+    id: "bd-teletalk-job-application-signature",
+    upload: "signature",
     title: "Teletalk job application signature",
     kind: "signature",
     rule: {

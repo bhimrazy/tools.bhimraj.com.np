@@ -1,13 +1,23 @@
-import { expect, type Page, type TestInfo } from "@playwright/test";
+import {
+  expect,
+  type Locator,
+  type Page,
+  type TestInfo,
+} from "@playwright/test";
 import type { TestImage } from "./images";
 
-export async function pickFile(page: Page, file: TestImage) {
-  await page.getByLabel(/^Choose/).setInputFiles(file);
+/** `scope` picks one tool when a form page holds several (e.g. its #photo section). */
+export async function pickFile(scope: Page | Locator, file: TestImage) {
+  await scope.getByLabel(/^Choose/).setInputFiles(file);
 }
 
 /** Waits for the result card and downloads the file through its link. */
-export async function downloadResult(page: Page, testInfo: TestInfo) {
-  const link = page.getByRole("link", { name: /^Download/ });
+export async function downloadResult(
+  page: Page,
+  testInfo: TestInfo,
+  scope: Page | Locator = page,
+) {
+  const link = scope.getByRole("link", { name: /^Download/ });
   await expect(link).toBeVisible({ timeout: 60_000 });
   const [download] = await Promise.all([
     page.waitForEvent("download"),

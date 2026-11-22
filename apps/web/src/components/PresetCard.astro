@@ -1,5 +1,5 @@
 ---
-import type { Preset } from "@tools/presets";
+import { uploadPath, type Preset } from "@tools/presets";
 import { formatByteRange, formatDimensions } from "../lib/format";
 
 interface Props {
@@ -9,10 +9,10 @@ const { preset } = Astro.props;
 const dims = formatDimensions(preset.rule);
 ---
 
-<a href={`/${preset.path}`} class="card grid h-full gap-1 p-4">
+<a href={uploadPath(preset)} class="card grid h-full gap-1 p-4">
   <span class="flex items-start justify-between gap-3">
     <span class="font-medium">{preset.title}</span>
-    {preset.verifiedAt === null && <span class="badge badge-warning">Unverified</span>}
+    {preset.verifiedAt === null && <span class="badge badge-warning">Not checked yet</span>}
   </span>
   <span class="text-sm text-muted">{preset.portal}</span>
   <span class="mt-2 font-mono text-xs text-muted">{[dims, formatByteRange(preset.rule)].filter(Boolean).join(" · ")}</span>

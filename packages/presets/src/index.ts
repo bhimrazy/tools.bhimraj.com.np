@@ -37,11 +37,14 @@ export interface SizeRule {
 export interface Preset {
   /** kebab-case, unique */
   id: string;
-  /** site path without leading slash, unique, e.g. "np/lok-sewa-photo" */
-  path: string;
   /** ISO 3166-1 alpha-2 */
   country: string;
   portal: string;
+  /** URL slugs: the page is /forms/{cc}/{org}/{form} and this upload its #{upload} section */
+  org: string;
+  form: string;
+  formTitle: string;
+  upload: string;
   title: string;
   kind: UploadKind;
   rule: SizeRule;
@@ -58,6 +61,25 @@ export function groupByCountry(
 ): Map<string, Preset[]> {
   const map = new Map<string, Preset[]>();
   for (const p of list) map.set(p.country, [...(map.get(p.country) ?? []), p]);
+  return map;
+}
+
+/** The form page, e.g. "/forms/np/psc/lok-sewa-application". The only place form URLs are built. */
+export const formPath = (p: Preset): string =>
+  `/forms/${p.country.toLowerCase()}/${p.org}/${p.form}`;
+
+/** One upload's section on its form page. */
+export const uploadPath = (p: Preset): string => `${formPath(p)}#${p.upload}`;
+
+/** Presets by form page path, in registry order. */
+export function groupByForm(
+  list: readonly Preset[] = presets,
+): Map<string, Preset[]> {
+  const map = new Map<string, Preset[]>();
+  for (const p of list) {
+    const path = formPath(p);
+    map.set(path, [...(map.get(path) ?? []), p]);
+  }
   return map;
 }
 

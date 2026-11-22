@@ -9,6 +9,9 @@ const source = {
 const common = {
   country: "NP",
   portal: "Lok Sewa Aayog (psconline.psc.gov.np)",
+  org: "psc",
+  form: "lok-sewa-application",
+  formTitle: "Lok Sewa Aayog online application",
   source,
   verifiedAt: null,
 } as const;
@@ -16,8 +19,8 @@ const common = {
 export const np: Preset[] = [
   {
     ...common,
-    id: "np-lok-sewa-photo",
-    path: "np/lok-sewa-photo",
+    id: "np-psc-lok-sewa-application-photo",
+    upload: "photo",
     title: "Lok Sewa Aayog online application photo",
     kind: "photo",
     rule: {
@@ -34,8 +37,8 @@ export const np: Preset[] = [
   },
   {
     ...common,
-    id: "np-lok-sewa-signature",
-    path: "np/lok-sewa-signature",
+    id: "np-psc-lok-sewa-application-signature",
+    upload: "signature",
     title: "Lok Sewa Aayog online application signature",
     kind: "signature",
     rule: {

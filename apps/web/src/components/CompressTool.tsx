@@ -23,6 +23,8 @@ export interface CompressToolProps {
   /** Fixed size rule (form pages). Omitted: the generic tool with an editable target size. */
   rule?: SizeRule;
   kind?: UploadKind;
+  /** Prefix for element ids, unique per page when a form page holds several tools. */
+  id?: string;
 }
 
 interface Original {
@@ -34,7 +36,7 @@ interface Original {
 
 type Result = CompressResult & { url: string; filename: string };
 
-const INPUT_ID = "compress-file";
+const DEFAULT_ID = "compress";
 const DEFAULT_MAX_KB = 100;
 
 const isHeic = (f: File) =>
@@ -84,7 +86,13 @@ function customRule(kb: string, w: string, h: string): SizeRule {
   return out;
 }
 
-export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
+export function CompressTool({
+  rule,
+  kind = "photo",
+  id = DEFAULT_ID,
+}: CompressToolProps) {
+  const inputId = `${id}-file`;
+  const resultId = `${id}-result-heading`;
   const [kb, setKb] = useState(String(DEFAULT_MAX_KB));
   const [w, setW] = useState("");
   const [h, setH] = useState("");
@@ -99,6 +107,7 @@ export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
   const worker = useRef<ImageWorker | null>(null);
   const job = useRef<AbortController | null>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
+  const root = useRef<HTMLDivElement>(null);
 
   const target: SizeRule = rule ?? customRule(kb, w, h);
 
@@ -118,6 +127,9 @@ export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
 
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
+      // With several tools on a page, the paste goes to the one holding focus.
+      const tools = document.querySelectorAll("[data-compress-tool]").length;
+      if (tools > 1 && !root.current?.contains(document.activeElement)) return;
       const pasted = [...(e.clipboardData?.files ?? [])].find((f) =>
         f.type.startsWith("image/"),
       );
@@ -212,11 +224,11 @@ export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
     : `≤ ${maxBytesToKb(target.maxBytes)} KB`;
 
   return (
-    <div class="grid gap-4">
+    <div class="grid gap-4" ref={root}>
       {!rule && (
         <form class="grid grid-cols-3 gap-3 sm:max-w-md" onSubmit={onSettings}>
           <label class="col-span-3 grid gap-1.5 text-sm font-medium sm:col-span-1">
-            Max size (KB)
+            Largest size (KB)
             <input
               class="field"
               name="kb"
@@ -314,7 +326,7 @@ export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
           {limit}
         </p>
         <input
-          id={INPUT_ID}
+          id={inputId}
           name="file"
           class="peer sr-only"
           type="file"
@@ -322,7 +334,7 @@ export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
           onChange={onInput}
         />
         <label
-          for={INPUT_ID}
+          for={inputId}
           class="btn-primary cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
         >
           {file ? `Choose another ${kind}` : `Choose ${kind}`}
@@ -350,15 +362,10 @@ export function CompressTool({ rule, kind = "photo" }: CompressToolProps) {
       {result && original && (
         <section
           class="card grid gap-5 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:p-6"
-          aria-labelledby="result-heading"
+          aria-labelledby={resultId}
         >
           <div class="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
-            <h2
-              id="result-heading"
-              ref={resultHeading}
-              tabIndex={-1}
-              class="text-lg"
-            >
+            <h2 id={resultId} ref={resultHeading} tabIndex={-1} class="text-lg">
               Result
             </h2>
             <span

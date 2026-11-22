@@ -3,10 +3,13 @@ import { kbToMaxBytes } from "../bytes";
 
 export const us: Preset[] = [
   {
-    id: "us-dv-lottery-photo",
-    path: "us/dv-lottery-photo",
+    id: "us-state-dept-dv-lottery-entry-photo",
     country: "US",
     portal: "Diversity Visa Program (dvprogram.state.gov)",
+    org: "state-dept",
+    form: "dv-lottery-entry",
+    formTitle: "US DV Lottery entry",
+    upload: "photo",
     title: "US DV Lottery entry photo",
     kind: "photo",
     rule: {
