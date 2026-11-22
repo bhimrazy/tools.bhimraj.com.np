@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 4402;
-const executablePath = process.env.PW_CHROMIUM_PATH;
+const executablePath = process.env.BROWSER_PATH;
 const launchOptions = executablePath ? { executablePath } : {};
 
 // Black-box suite against the built site: run `bun run build` first. wrangler serves ./dist

@@ -13,17 +13,17 @@ const server = await createServer({
 });
 await server.listen();
 
-const executablePath = process.env.PW_CHROMIUM_PATH;
+const executablePath = process.env.BROWSER_PATH;
 const browser = await chromium.launch(executablePath ? { executablePath } : {});
 
 interface Row extends JobResult {
   mode: string;
-  heapPeakMB: number | null;
+  heapPeakMiB: number | null;
 }
 const rows: Row[] = [];
 
 try {
-  // CDP cannot throttle workers, so the throttled run executes the engine code on the main thread.
+  // CDP cannot throttle workers, so the throttled run runs the image code on the main thread.
   const modes = [
     { mode: "worker", where: "worker", rate: 1 },
     { mode: "main-thread", where: "main", rate: 1 },
@@ -34,17 +34,17 @@ try {
     page.on("pageerror", (e) => console.error("pageerror:", e.message));
     await page.goto(`http://127.0.0.1:${PORT}/`);
     await page.waitForFunction(() => "bench" in window);
-    // Generate inputs first so throttling only slows the engine under test.
+    // Generate inputs first so throttling only slows the code under test.
     await page.evaluate(() => (window as any).bench.prepare());
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Performance.enable");
     await cdp.send("Emulation.setCPUThrottlingRate", { rate });
 
-    const specs = await page.evaluate(() => {
+    const jobs = await page.evaluate(() => {
       const b = (window as any).bench;
       return [...b.jobs, ...b.presetJobs()];
     });
-    for (const job of specs) {
+    for (const job of jobs) {
       let peak = 0;
       const sample = setInterval(async () => {
         try {
@@ -63,7 +63,7 @@ try {
       rows.push({
         ...r,
         mode,
-        heapPeakMB:
+        heapPeakMiB:
           where === "main" && peak ? Math.round(peak / 104857.6) / 10 : null,
       });
     }
@@ -83,10 +83,10 @@ console.table(
     "wall ms": r.wallMs,
     "out KB": kb(r.outBytes),
     "max KB": kb(r.maxBytes),
-    ok: r.withinTarget,
+    ok: r.fitsBytes,
     size: `${r.width}x${r.height}`,
-    q: r.quality,
-    "heap peak MB": r.heapPeakMB ?? "n/a",
+    quality: r.quality,
+    "heap peak MiB": r.heapPeakMiB ?? "n/a",
   })),
 );
 
