@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { watchPage } from "./images";
+import { watchPage } from "./page";
 
 const pages = [
   { path: "/", title: /^Tools: form-ready photos/, canonical: "/" },

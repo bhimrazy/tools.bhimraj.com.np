@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { decodeImage, downloadResult, makeImage, pickFile } from "./images";
+import { decodeImage, makeImage } from "./images";
+import { downloadResult, pickFile } from "./page";
 
 test("free-size 12 MP photo compresses to 100 KB", async ({
   page,

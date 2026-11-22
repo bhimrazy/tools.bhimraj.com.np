@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { downloadResult, makeImage, pickFile } from "./images";
+import { makeImage } from "./images";
+import { downloadResult, pickFile } from "./page";
 
 // "Files never leave your device": nothing may be requested from outside the site origin.
 test("every request stays on the site origin, including a full compress run", async ({
