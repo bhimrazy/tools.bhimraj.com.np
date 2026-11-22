@@ -8,9 +8,10 @@ on:
 permissions:
   contents: read
 
+# Runs on main are never cancelled: production.yml deploys the commit whose CI succeeded.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -24,6 +25,10 @@ jobs:
       - run: bun fmt --check
       - run: bun run check:host
       - run: bun audit --audit-level=high
+      # The deploy CLI's own lockfile. Its exact-pinned transitive deps carry known high DoS/ReDoS
+      # advisories with no fixed CLI past the cooldown yet; critical ones fail.
+      - run: bun audit --audit-level=critical
+        working-directory: .github/vercel-cli
       - run: bun run typecheck
       - run: bun test
       - run: bun run build

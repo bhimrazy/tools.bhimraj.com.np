@@ -1,0 +1,4 @@
+[install]
+# Owner policy: only install releases at least 7 days old.
+minimumReleaseAge = "7d"
+exact = true

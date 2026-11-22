@@ -14,7 +14,7 @@ Status: accepted (2026-11-17)
   by default; only the tool island hydrates. Hundreds of preset pages come from
   `getStaticPaths` over `@tools/presets`. Next.js static export was rejected: it
   sends a React runtime to every page and its server features go unused.
-- **Cloudflare Workers static assets.** Static output only, no server code;
-  `_headers` sets a strict CSP. 25 MiB per file, 20,000 files on the free plan.
+- **Cloudflare Workers static assets.** Superseded by [0006](0006-vercel-hosting.md): Vercel,
+  with the CSP in `apps/web/vercel.json`.
 - **Source-only packages.** `exports` point at TypeScript sources; Vite compiles them
   in the app. No per-package build step.

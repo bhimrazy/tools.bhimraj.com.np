@@ -1,0 +1,102 @@
+name: Vercel Cleanup
+
+# Deletes old deployments after the owner approves the planned list.
+on:
+  workflow_dispatch:
+    inputs:
+      keep_production:
+        description: Newest ready production deployments to keep (the live one always stays).
+        type: number
+        default: 3
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: vercel-cleanup
+  cancel-in-progress: false
+
+jobs:
+  # Lists what it would delete in the run summary, before anyone approves.
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment: vercel-production
+    permissions: {}
+    outputs:
+      ids: ${{ steps.plan.outputs.ids }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - id: plan
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          TEAM_ID: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          KEEP: ${{ inputs.keep_production }}
+        run: |
+          set -euo pipefail
+          [[ "$KEEP" =~ ^[0-9]+$ && "$KEEP" -ge 1 ]] || { echo "::error::keep_production must be 1 or more"; exit 1; }
+          api() { curl -fsS -H @- "https://api.vercel.com$1" <<< "Authorization: Bearer $VERCEL_TOKEN"; }
+          live=$(api "/v9/projects/$PROJECT_ID?teamId=$TEAM_ID" | jq -er .targets.production.id)
+          url="/v6/deployments?projectId=$PROJECT_ID&teamId=$TEAM_ID&limit=100"
+          : > all.jsonl
+          while :; do
+            page=$(api "$url")
+            jq -c '.deployments[]' <<< "$page" >> all.jsonl
+            next=$(jq -r '.pagination.next // empty' <<< "$page")
+            [ -n "$next" ] || break
+            url="/v6/deployments?projectId=$PROJECT_ID&teamId=$TEAM_ID&limit=100&until=$next"
+          done
+          jq -s -c --arg live "$live" --argjson keep "$KEEP" '
+            (map(select(.target == "production" and .state == "READY")) | sort_by(-.created) | .[:$keep] | map(.uid)) as $kept
+            | map(select(.uid != $live and (.uid as $u | $kept | index($u) | not)))
+            | sort_by(.created)' all.jsonl > delete.json
+          {
+            echo "### Vercel cleanup plan"
+            echo
+            echo "Live: \`$live\`. Deleting **$(jq length delete.json)** of $(wc -l < all.jsonl), keeping the newest $KEEP ready production deployments."
+            echo
+            echo "| Deployment | Target | State | Created |"
+            echo "| --- | --- | --- | --- |"
+            jq -r '.[] | "| `\(.uid)` | \(.target // "preview") | \(.state) | \(.created / 1000 | todate) |"' delete.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "count=$(jq length delete.json)" >> "$GITHUB_OUTPUT"
+          echo "ids=$(jq -r 'map(.uid) | join(" ")' delete.json)" >> "$GITHUB_OUTPUT"
+
+  # The approval gate (required reviewer); holds no secrets.
+  approve:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment: vercel-cleanup
+    permissions: {}
+    steps:
+      - run: echo "Approved."
+
+  delete:
+    needs: [plan, approve]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    environment: vercel-production
+    permissions: {}
+    steps:
+      - env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          TEAM_ID: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          IDS: ${{ needs.plan.outputs.ids }}
+        run: |
+          set -euo pipefail
+          api() { curl -fsS -H @- "$@" <<< "Authorization: Bearer $VERCEL_TOKEN"; }
+          # Production may have moved while waiting for approval.
+          live=$(api "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=$TEAM_ID" | jq -er .targets.production.id)
+          failed=0
+          for id in $IDS; do
+            [[ "$id" =~ ^dpl_[A-Za-z0-9]+$ ]] || { echo "::error::Unexpected id $id"; exit 1; }
+            [ "$id" != "$live" ] || { echo "Skipping $id: it is live now."; continue; }
+            api -o /dev/null -X DELETE "https://api.vercel.com/v13/deployments/$id?teamId=$TEAM_ID" ||
+              { failed=$((failed + 1)); echo "::warning::Couldn't delete $id"; }
+          done
+          [ "$failed" -eq 0 ]

@@ -6,15 +6,15 @@ Read `README.md` for the layout and `docs/adr/` for decisions before changing st
 ## Principles
 
 - **Files never leave the device.** No network calls from tool code, no third-party
-  scripts, fonts or analytics on tool pages. The CSP in `apps/web/public/_headers`
+  scripts, fonts or analytics on tool pages. The CSP in `apps/web/vercel.json`
   (`connect-src 'self'`) must keep passing.
 - **Low-end Android first.** Target a 2–3 GB phone: one job at a time, workers
   terminated when idle, decoded images kept under 16,777,216 px (iOS canvas cap),
   heavy code loaded only via dynamic `import()` when a tool needs it.
 - **Presets are the product.** Every preset in `packages/presets` cites a source and a
   `verifiedAt` date, or is `null` and shown as not checked yet. Never invent a figure.
-- **Host-neutral.** The production host lives only in `packages/site/src/origin.ts`
-  and `apps/web/wrangler.jsonc`; `bun run check:host` fails otherwise.
+- **Host-neutral.** The production host lives only in `packages/site/src/origin.ts`;
+  `bun run check:host` fails otherwise. Domains are attached in Vercel (`docs/deployment.md`).
 - **Permissive dependencies only** (MIT/BSD/Apache/MPL) until the v2 licence decision;
   no AGPL libraries, no non-commercial models. Exception: fonts may be OFL-1.1, self-hosted and
   unmodified (Onest, Noto Sans Devanagari, Noto Sans Bengali).
@@ -67,5 +67,5 @@ bun run verify
 ```
 
 CI also runs the browser suite (`bun run build && bun run e2e`) after `check`; run it when you touch UI,
-`packages/image` or `_headers`. Browser tests (`*.e2e.ts`) live in `apps/web/e2e` and assert behaviour, not
+`packages/image` or `vercel.json`. Browser tests (`*.e2e.ts`) live in `apps/web/e2e` and assert behaviour, not
 markup classes.
