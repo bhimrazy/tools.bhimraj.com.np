@@ -89,6 +89,8 @@ test("getPreset and groupByCountry", () => {
   expect(getPreset("us-state-dept-dv-lottery-entry-photo")?.country).toBe("US");
   expect(getPreset("nope")).toBeUndefined();
   expect(groupByCountry().get("NP")?.length).toBe(2);
+  // The owner's order, not alphabetical.
+  expect([...groupByCountry().keys()]).toEqual(["NP", "US", "BD"]);
 });
 
 test("data passes the zod schema", () => {

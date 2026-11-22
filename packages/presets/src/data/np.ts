@@ -12,6 +12,7 @@ const common = {
   org: "psc",
   form: "lok-sewa-application",
   formTitle: "Lok Sewa Aayog online application",
+  formLocalName: { lang: "ne", text: "लोक सेवा आयोग" },
   source,
   verifiedAt: null,
 } as const;
